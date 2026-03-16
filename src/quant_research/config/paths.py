@@ -25,5 +25,5 @@ ASSET_FEATURE_PATH = FEATURES_PATH / "asset"
 # Feature families
 # ============================================================
 
-MOMENTUM_FEATURE_PATH = ASSET_FEATURE_PATH / "momentum"
-VOLATILITY_FEATURE_PATH = ASSET_FEATURE_PATH / "volatility"
+MOMENTUM_FEATURE_PATH = ASSET_FEATURE_PATH / "Momentum"
+VOLATILITY_FEATURE_PATH = ASSET_FEATURE_PATH / "Volatility"
