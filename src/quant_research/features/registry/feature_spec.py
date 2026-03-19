@@ -12,7 +12,8 @@ class FeatureSpec:
     inputs: List[str]
     parameters: Dict
     
-    compute_fn: Callable
+    compute_fn: Callable  # now: compute_fn(df_raw) → df_features
+    
     frequency: str
 
     def __post_init__(self):
@@ -21,3 +22,7 @@ class FeatureSpec:
         
         if self.column != self.name:
             raise ValueError("column must match name (convention)")
+
+        # NEW: enforce compute_fn contract (optional but recommended)
+        if not callable(self.compute_fn):
+            raise ValueError("compute_fn must be callable")
