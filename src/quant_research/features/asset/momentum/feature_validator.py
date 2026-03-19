@@ -5,7 +5,7 @@
 import pandas as pd
 import numpy as np
 
-from quant_research.features.asset.momentum.features_engine import compute_momentum_features
+from quant_research.features.asset.momentum.features_engine import build_momentum_features
 from .config import (
     LOOKBACK_WINDOWS,
     NORMALIZATION_WINDOW,
@@ -68,15 +68,7 @@ def validate_asset_features(
     # --------------------------------------------------------
     # Compute expected features (SOURCE OF TRUTH)
     # --------------------------------------------------------
-    df_expected = compute_momentum_features(
-        df_raw=df_raw,
-        lookback_windows=LOOKBACK_WINDOWS,
-        normalization_window=NORMALIZATION_WINDOW,
-        smooth_windows=SMOOTH_WINDOWS,
-        msi_weights=MSI_WEIGHTS,
-        mom_align_threshold=MOM_ALIGN_THRESHOLD,
-        msi_smooth_window=MSI_SMOOTH_WINDOW,
-    )
+    df_expected = build_momentum_features(df_raw)
 
     # --------------------------------------------------------
     # Align columns
