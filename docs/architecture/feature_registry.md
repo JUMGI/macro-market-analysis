@@ -48,12 +48,13 @@ It typically includes:
 
 Example:
 
-```python
 FeatureSpec(
     name="momentum_63",
     family="momentum",
     compute_fn=compute_momentum_63,
 )
+
+---
 Registry Structure
 
 The registry is structured as:
