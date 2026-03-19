@@ -10,32 +10,31 @@
 
 Construct a **multi-horizon volatility characterization layer** capturing:
 
-- Volatility level
-- Volatility dynamics
-- Volatility structure across horizons
-- Volatility regime positioning
-- Volatility instability
+- Volatility level  
+- Volatility dynamics (derivatives)  
+- Volatility structure across horizons  
+- Volatility regime positioning  
+- Volatility instability  
+- Volatility strength (composite signal)  
 
-The output is a **multi-index DataFrame**:
+The output is a **single-index DataFrame per asset**.
 
 **Columns**
 
-- level 0 → feature
-- level 1 → asset
+- feature columns for that specific asset
 
 **Rows**
 
-- datetime index
+- datetime index (aligned to the asset’s own trading calendar) 
 
 ---
 
 # 2. Input Assumptions
 
-- Clean adjusted close prices
-- No missing timestamps inside trading calendar
-- Log returns used for volatility computation
-- Annualization factor applied where required
-- All calculations performed per asset independently
+- Clean adjusted close prices  
+- No missing timestamps inside trading calendar  
+- Log returns used for volatility computation  
+- All calculations performed per asset independently  
 
 Let:
 
@@ -43,21 +42,21 @@ $$
 r_t = \log\left(\frac{P_t}{P_{t-1}}\right)
 $$
 
-where \(P_t\) denotes the adjusted close price.
-
 ---
 
 # 3. Feature Blocks
 
+---
+
 ## 3.1 Volatility Level
 
-Realized volatility is computed as the rolling standard deviation of log returns.
+Realized volatility is computed as rolling standard deviation of log returns:
 
 $$
-VOL_h = \sqrt{252} \cdot \sigma_h(r_t)
+VOL_h = \sigma_h(r_t)
 $$
 
-where
+Where:
 
 $$
 \sigma_h(r_t) = \sqrt{\frac{1}{h} \sum_{i=1}^{h}(r_{t-i}-\bar{r})^2}
@@ -65,220 +64,253 @@ $$
 
 **Horizons**
 
-- 21
-- 63
-- 126
-- 252
+- 5  
+- 21   
+- 63    
+- 126  
+- 252  
 
-These produce the following features:
+**Features**
 
-VOL_21
-VOL_63
-VOL_126
-VOL_252
+- VOL_5  
+- VOL_21    
+- VOL_63    
+- VOL_126  
+- VOL_252  
 
+### Z-score normalization
+
+$$
+VOL_{h,Z} =
+\frac{VOL_h - \mu_{N}(VOL_h)}{\sigma_{N}(VOL_h)}
+$$
+
+**Important**
+
+- ❌ NO smoothing applied to volatility level  
+- Level is kept raw for signal integrity  
 
 **Purpose**
 
-Capture short, medium and long-term volatility environments.
+Capture:
+
+- volatility regimes  
+- structural risk levels  
+- persistence of volatility states  
 
 ---
 
-## 3.2 Volatility Dynamics
+## 3.2 Volatility Dynamics (Derivatives)
 
-Volatility dynamics capture the **speed and curvature of volatility changes**.
-
-### Velocity
-
-First difference of volatility:
+### Velocity (1st derivative)
 
 $$
-VOL_{h,CHG}(t) = VOL_h(t) - VOL_h(t-1)
+VOL_{h,VEL}(t) = VOL_h(t) - VOL_h(t-1)
 $$
 
-### Acceleration
-
-Second difference of volatility:
+### Acceleration (2nd derivative)
 
 $$
-VOL_{h,ACC}(t) = VOL_{h,CHG}(t) - VOL_{h,CHG}(t-1)
+VOL_{h,ACC}(t) = VOL_{h,VEL}(t) - VOL_{h,VEL}(t-1)
 $$
 
-### Smoothed variants
+### Smoothed derivatives
 
-Smoothed versions are used to reduce noise:
-VOL_h_CHG_S
-VOL_h_ACC_S
+$$
+VOL_{h,VEL,S}
+$$
 
+$$
+VOL_{h,ACC,S}
+$$
+
+(using rolling mean)
+
+**Important**
+
+- ✅ Smoothing is applied **only to derivatives**  
+- ❌ No smoothing on level  
 
 **Purpose**
 
-Detect:
-
-- volatility shocks
-- volatility expansion
-- volatility stabilization phases
+- detect volatility shocks  
+- capture convexity / curvature  
+- identify regime transitions earlier than level  
 
 ---
 
 ## 3.3 Volatility Structure
 
-The term structure of volatility is captured through **spreads and ratios between horizons**.
-
-### Volatility spreads
+### Term structure (spreads)
 
 $$
-VOL\_TERM_{21,63} = VOL_{21} - VOL_{63}
+VOL\_TS_{s,l} = VOL_s - VOL_l
 $$
 
-$$
-VOL\_TERM_{21,126} = VOL_{21} - VOL_{126}
-$$
+Pairs:
 
-$$
-VOL\_TERM_{21,252} = VOL_{21} - VOL_{252}
-$$
-
-Features:
-VOL_TERM_21_63
-VOL_TERM_21_126
-VOL_TERM_21_252
-
-
-### Volatility ratios
-
-$$
-VOL\_RATIO_{21,63} = \frac{VOL_{21}}{VOL_{63}} - 1
-$$
-
-$$
-VOL\_RATIO_{21,126} = \frac{VOL_{21}}{VOL_{126}} - 1
-$$
-
-$$
-VOL\_RATIO_{21,252} = \frac{VOL_{21}}{VOL_{252}} - 1
-$$
-
-Features:
-VOL_RATIO_21_63
-VOL_RATIO_21_126
-VOL_RATIO_21_252
-
-
-**Purpose**
-
-Capture short-term volatility dislocations relative to longer-term volatility regimes.
+- (21, 63)  
+- (21, 126)  
+- (21, 252)  
+- (63, 126)  
+- (63, 252)  
 
 ---
 
-## 3.4 Volatility of Volatility
-
-Volatility of volatility measures the **instability of the volatility process itself**.
+### Ratios (expansion proxy)
 
 $$
-VOV_{21,63} = \sigma_{63}(VOL_{21})
+VOL\_RATIO_{s,l} = \frac{VOL_s}{VOL_l} - 1
 $$
 
-Feature:
-VOV_21_63
+---
 
+### Expansion flag
+
+$$
+EXP_{s,l} = \mathbb{1}(VOL_s > VOL_l)
+$$
+
+---
 
 **Purpose**
 
-Identify turbulent periods where volatility itself becomes unstable.
+- detect volatility regime steepening / flattening  
+- identify short-term stress vs long-term normalization  
 
-High values indicate:
+---
 
-- regime transitions
-- market stress
-- structural volatility shifts
+## 3.4 Volatility of Volatility (VOV)
+
+Revised definition:
+
+$$
+VOV_h = \sigma_k(VOL_h)
+$$
+
+Where:
+
+- volatility is treated as a time series  
+- rolling window captures instability of volatility itself  
+
+---
+
+### Z-score
+
+$$
+VOV_{h,Z}
+$$
+
+---
+
+**Purpose**
+
+- detect instability in volatility regimes  
+- identify regime transitions  
+- measure “turbulence of risk”  
 
 ---
 
 ## 3.5 Volatility Regime Indicators
 
-Volatility regimes are characterized using standardized measures relative to historical distributions.
-
-### Z-score normalization
-
-Short-term regime:
+### Z-score
 
 $$
-VOL_{21,Z} =
-\frac{VOL_{21} - \mu_{252}(VOL_{21})}{\sigma_{252}(VOL_{21})}
+VOL_{h,Z}
 $$
 
-Long-term regime:
+---
+
+### Percentile Rank (PCTL)
 
 $$
-VOL_{252,Z} =
-\frac{VOL_{252} - \mu_{252}(VOL_{252})}{\sigma_{252}(VOL_{252})}
+VOL_{h,PCTL} =
+\text{PercentileRank}_{N}(VOL_h)
 $$
 
-Features:
-VOL_21_Z
-VOL_252_Z
+---
 
-### Percentile rank
-
-Short-term percentile positioning:
+### Expansion indicator
 
 $$
-VOL_{21,PCTL} =
-\text{PercentileRank}_{252}(VOL_{21})
+EXP_{s,l} = \mathbb{1}(VOL_s > VOL_l)
 $$
 
-Feature:
-VOL_21_PCTL
-
-
-### Volatility expansion indicator
-
-Short vs medium horizon expansion:
-
-$$
-VOL_{21,EXP63} =
-\frac{VOL_{21}}{VOL_{63}} - 1
-$$
-
-Feature:
-VOL_21_63_EXP
-
+---
 
 **Purpose**
 
-Normalize volatility relative to historical distributions and detect structural risk regimes.
+- normalize volatility across time  
+- identify regime extremes  
+- provide bounded regime signals for modeling  
+
+---
+
+## 3.6 Volatility Strength Index (VSI)
+
+Composite multi-horizon signal:
+
+$$
+VSI = \sum_{h \in H} w_h \cdot VOL_{h,Z}
+$$
+
+---
+
+### Smoothing
+
+$$
+VSI_S = \text{MA}_k(VSI)
+$$
+
+---
+
+**Purpose**
+
+- aggregate multi-horizon volatility into a single signal  
+- capture volatility strength across scales  
+- act as a synthetic risk factor  
 
 ---
 
 # 4. Design Principles
 
-- No discretization inside this layer
-- All features remain continuous
-- No regime labeling performed here
-- No allocation logic embedded
-- Feature definitions remain asset-specific
-
-The architecture follows a strict **separation of concerns** principle.
+- All features are **continuous**  
+- No hard regime labels  
+- No discretization inside this layer  
+- Features are **asset-independent but asset-specific**  
+- Strict separation of:
+  - computation  
+  - normalization  
+  - aggregation  
 
 ---
 
 # 5. Known Limitations
 
-- Rolling windows introduce warm-up NaNs
-- Long horizons reduce effective sample size
-- Extreme events may dominate rolling statistics
-- Volatility clustering can produce persistent high regimes
+- Rolling windows create warm-up effects  
+- Long horizons reduce effective sample size  
+- Extreme events can dominate statistics  
+- Volatility clustering may bias normalization  
+- PCTL depends heavily on window choice  
 
 ---
 
 # 6. Downstream Usage
 
-The Volatility Family feeds the following layers:
+The Volatility Family feeds:
 
-- **Correlation Structure Layer**
-- **Cross-Asset Systemic Risk Analysis**
-- **Regime Detection Layer**
-- **Portfolio Risk Controls**
+- Regime Detection Layer  
+- Cross-Asset Systemic Risk  
+- Correlation Structure  
+- Portfolio Risk Models  
+- Feature selection / ML models  
 
-These features are designed to integrate with the **global research feature panel** and support higher-level market structure analysis.
+---
+
+# 7. Notes on Implementation Alignment
+
+- Derivatives (VEL, ACC) are computed explicitly  
+- PCTL complements Z-score  
+- VSI aggregates normalized signals  
+- Smoothing is applied only to derivatives and VSI  
+- Feature engine fully mirrors notebook logic  

@@ -14,14 +14,15 @@ Construct a multi-horizon momentum characterization layer capturing:
 - Signal stability
 - Cross-horizon agreement
 
-The output is a multi-index DataFrame:
+The output is a **single-index DataFrame per asset**.
 
-Columns:
-    level 0 → feature
-    level 1 → asset
+**Columns**
 
-Rows:
-    datetime index
+- feature columns for that specific asset
+
+**Rows**
+
+- datetime index (aligned to the asset’s own trading calendar) 
 
 ---
 
@@ -41,6 +42,7 @@ Rows:
 MOM_h = log(price_t / price_{t-h})
 
 Horizons:
+- 5
 - 21
 - 63
 - 126
