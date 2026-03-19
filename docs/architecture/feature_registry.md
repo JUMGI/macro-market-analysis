@@ -54,9 +54,8 @@ FeatureSpec(
     compute_fn=compute_momentum_63,
 )
 
----
 Registry Structure
-
+---
 The registry is structured as:
 
 family → feature_name → FeatureSpec
@@ -66,19 +65,20 @@ Example:
 registry["momentum"]["momentum_63"]
 registry["volatility"]["vol_252"]
 
----
+
 
 Initialization
+---
 
 The registry is initialized from a base path that contains feature definitions and/or configurations.
 
 During initialization:
 
-feature modules are discovered
+- feature modules are discovered
 
-feature specs are registered
+- feature specs are registered
 
-compute functions are linked to each feature
+- compute functions are linked to each feature
 
 Example:
 
@@ -86,16 +86,21 @@ from quant_research.features.registry import create_registry
 
 registry = create_registry(base_path)
 
----
+
 
 Usage
-Retrieve a Feature
+---
+
+- Retrieve a Feature
+
 spec = registry.get(family="momentum", feature="momentum_63")
 
-Compute a Feature
+- Compute a Feature
+
 df_feature = spec.compute_fn(df_raw)
 
-Example Workflow
+- Example Workflow
+
 registry = create_registry(base_path)
 
 spec = registry.get("momentum", "momentum_63")
@@ -108,28 +113,29 @@ Design Principles
 
 1. Extensibility
 
-New features can be added without modifying core logic.
+- New features can be added without modifying core logic.
 
 2. Decoupling
 
-Feature logic is separated from data loading
+- Feature logic is separated from data loading
 
-Registry does not depend on storage format
+- Registry does not depend on storage format
 
 3. Discoverability
 
-Features can be queried dynamically from the registry.
+- Features can be queried dynamically from the registry.
 
 4. Composability
 
-Features can be combined, reused, and extended across families and assets.
+- Features can be combined, reused, and extended across families and assets.
 
 5. Deterministic Computation
 
-Given the same input data, feature computation must be deterministic.
+- Given the same input data, feature computation must be deterministic.
 
----
+
 ## Registry vs Other Components
+---
 
 | Component                     | Responsibility                      |
 |------------------------------|-------------------------------------|
@@ -161,9 +167,11 @@ Future Extensions:
 
 - Integration with experiment tracking systems
 
----
-Example Directory Structure
 
+Example Directory Structure
+---
+
+```
 src/quant_research/features/
 ├── registry/
 │   ├── asset_feature_registry.py
@@ -175,8 +183,10 @@ src/quant_research/features/
 │   │   └── momentum_features.py
 │   └── volatility/
 │       └── volatility_features.py
----
+```
+
 Final Insight
+---
 
 The Feature Registry is the source of truth for feature definitions in the system.
 
