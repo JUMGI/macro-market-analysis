@@ -54,7 +54,7 @@ Example:
 
 ## Usage
 
-```python
+
 from quant_research.features.loaders.feature_loader import FeatureLoader
 
 loader = FeatureLoader()
