@@ -61,3 +61,6 @@ def get_groups_by_type(asset_list: Optional[List[Asset]] = None) -> Dict[str, Li
     for a in assets:
         groups.setdefault(a.asset_type, []).append(a)
     return groups
+def get_symbols(asset_list=None):
+    assets = asset_list if asset_list else ASSET_UNIVERSE
+    return [a.symbol for a in assets]
