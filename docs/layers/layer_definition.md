@@ -18,6 +18,7 @@ Not allowed:
 - Signal generation
 - Cross-asset operations
 - Temporal resampling or frequency transformation
+- Forward-looking transformations (no lookahead bias)
 
 ---
 
