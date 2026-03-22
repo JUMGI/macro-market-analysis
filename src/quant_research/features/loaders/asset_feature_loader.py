@@ -11,10 +11,15 @@ class FeatureLoader:
 
     data/features/asset/{family}/{asset}.parquet
 
+    Conventions:
     - 1 file per asset
-    - index = datetime
+    - index = DatetimeIndex (sorted, unique)
     - columns = features
     """
+
+    # ============================================================
+    # INIT
+    # ============================================================
 
     def __init__(self, base_path: Union[str, Path] = FEATURES_PATH):
         self.base_path = Path(base_path)
@@ -31,7 +36,13 @@ class FeatureLoader:
         Resolve path:
         data/features/asset/{family}/{asset}.parquet
         """
-        path = self.base_path / "asset" / family / f"{asset}.parquet"
+
+        family_path = self.base_path / "asset" / family
+
+        if not family_path.exists():
+            raise ValueError(f"Unknown feature family: {family}")
+
+        path = family_path / f"{asset}.parquet"
 
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
@@ -53,56 +64,106 @@ class FeatureLoader:
         """
         Load features for a given asset and family.
 
-        Parameters:
-        - family: e.g. 'momentum', 'volatility'
-        - asset: e.g. 'SPY', 'BTC'
-        - features: subset of columns (optional)
-        - start/end: date filtering
+        Parameters
+        ----------
+        family : str
+            Feature family (e.g. 'momentum', 'volatility')
+        asset : str
+            Asset symbol (e.g. 'SPY', 'BTC')
+        features : list[str], optional
+            Subset of features to load
+        start : str, optional
+            Start date (inclusive)
+        end : str, optional
+            End date (inclusive)
+
+        Returns
+        -------
+        pd.DataFrame
+            Feature dataframe with DatetimeIndex and feature columns
         """
 
         path = self._get_asset_file(family, asset)
 
-        df = pd.read_parquet(path)
+        # --------------------------------------------------------
+        # Load & enforce ordering
+        # --------------------------------------------------------
+        df = pd.read_parquet(path).sort_index()
 
-        # --------------------------------------------
+        # --------------------------------------------------------
+        # Index validation (CRITICAL)
+        # --------------------------------------------------------
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError(f"{asset} ({family}): Index must be DatetimeIndex")
+
+        if not df.index.is_monotonic_increasing:
+            raise ValueError(f"{asset} ({family}): Index must be sorted")
+
+        if df.index.has_duplicates:
+            raise ValueError(f"{asset} ({family}): Index contains duplicates")
+
+        if df.empty:
+            raise ValueError(f"{asset} ({family}): Feature file is empty")
+
+        # --------------------------------------------------------
         # Feature filtering
-        # --------------------------------------------
+        # --------------------------------------------------------
         if features is not None:
             missing = [f for f in features if f not in df.columns]
+
             if missing:
-                raise ValueError(f"Missing features: {missing}")
+                raise ValueError(
+                    f"{asset} ({family}): Missing features: {missing}"
+                )
 
             df = df[features]
 
-        # --------------------------------------------
+        # --------------------------------------------------------
         # Date filtering
-        # --------------------------------------------
+        # --------------------------------------------------------
         if start or end:
-            if not isinstance(df.index, pd.DatetimeIndex):
-                raise ValueError("Index must be DatetimeIndex for date filtering")
-
             if start:
-                df = df[df.index >= pd.to_datetime(start)]
+                start_dt = pd.to_datetime(start)
+                df = df[df.index >= start_dt]
 
             if end:
-                df = df[df.index <= pd.to_datetime(end)]
+                end_dt = pd.to_datetime(end)
+                df = df[df.index <= end_dt]
 
         return df
 
     # ============================================================
-    # Multi-asset loader (clave para panel)
+    # Multi-asset loader (panel-ready)
     # ============================================================
 
-    def load_multi_asset(
+    def load_assets_features(
         self,
         family: str,
         assets: List[str],
-        feature: Optional[str] = None,
+        features: Optional[List[str]] = None,
         start: Optional[str] = None,
         end: Optional[str] = None,
     ) -> Dict[str, pd.DataFrame]:
         """
-        Load same feature across multiple assets.
+        Load features for multiple assets within a family.
+
+        Parameters
+        ----------
+        family : str
+            Feature family
+        assets : list[str]
+            List of asset symbols
+        features : list[str], optional
+            Subset of features
+        start : str, optional
+            Start date
+        end : str, optional
+            End date
+
+        Returns
+        -------
+        dict[str, pd.DataFrame]
+            Mapping: asset -> feature DataFrame
         """
 
         data = {}
@@ -111,7 +172,7 @@ class FeatureLoader:
             df = self.load_asset_features(
                 family=family,
                 asset=asset,
-                features=[feature] if feature else None,
+                features=features,
                 start=start,
                 end=end,
             )
