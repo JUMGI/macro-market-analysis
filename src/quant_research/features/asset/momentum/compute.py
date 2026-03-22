@@ -1,4 +1,4 @@
-# src/quant_research/features/asset/momentum/feature_engine.py
+# src/quant_research/features/asset/momentum/compute.py
 
 import pandas as pd
 import numpy as np
@@ -17,6 +17,10 @@ from quant_research.features.asset.momentum.config import (
 # ============================================================
 
 def compute_momentum(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute log-return based momentum over multiple horizons.
+    """
+
     feat_df = pd.DataFrame(index=df.index)
     price = df["adj_close"]
 
@@ -31,6 +35,10 @@ def compute_momentum(df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def compute_derivatives(mom_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute velocity and acceleration of momentum.
+    """
+
     feat_df = pd.DataFrame(index=mom_df.index)
 
     for h in LOOKBACK_WINDOWS:
@@ -59,6 +67,10 @@ def compute_derivatives(mom_df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def compute_normalization(mom_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize momentum using rolling statistics.
+    """
+
     feat_df = pd.DataFrame(index=mom_df.index)
 
     for h in LOOKBACK_WINDOWS:
@@ -84,6 +96,10 @@ def compute_normalization(mom_df: pd.DataFrame) -> pd.DataFrame:
 # ============================================================
 
 def compute_msi(mom_df: pd.DataFrame, mom_z_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute Momentum Strength Index (MSI) and its derivatives.
+    """
+
     feat_df = pd.DataFrame(index=mom_df.index)
 
     msi = sum(
@@ -107,17 +123,23 @@ def compute_msi(mom_df: pd.DataFrame, mom_z_df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ============================================================
-# 5. MOM ALIGNMENT
+# 5. MOMENTUM ALIGNMENT
 # ============================================================
 
 def compute_alignment(mom_df: pd.DataFrame, mom_z_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute momentum alignment metrics across horizons.
+    """
+
     feat_df = pd.DataFrame(index=mom_df.index)
 
     mom_cols = [f"MOM_{h}" for h in LOOKBACK_WINDOWS if f"MOM_{h}" in mom_df.columns]
     mom_z_cols = [f"MOM_{h}_Z" for h in LOOKBACK_WINDOWS if f"MOM_{h}_Z" in mom_z_df.columns]
 
+    # Raw alignment
     feat_df["MOM_ALIGN"] = np.sign(mom_df[mom_cols]).mean(axis=1)
 
+    # Z-filtered alignment
     mom_z_copy = mom_z_df[mom_z_cols].copy()
     mom_z_copy[np.abs(mom_z_copy) < MOM_ALIGN_THRESHOLD] = np.nan
 
@@ -128,33 +150,63 @@ def compute_alignment(mom_df: pd.DataFrame, mom_z_df: pd.DataFrame) -> pd.DataFr
 
 
 # ============================================================
-# ORCHESTRATOR
+# INTERNAL ORCHESTRATOR
 # ============================================================
 
 def build_momentum_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Internal pipeline to construct full momentum feature set.
+    """
 
-    # 1. MOMENTUM
+    # 1. Momentum levels
     mom_df = compute_momentum(df)
 
-    # 2. DERIVATIVES
+    # 2. Derivatives
     deriv_df = compute_derivatives(mom_df)
 
-    # 3. NORMALIZATION
+    # 3. Normalization
     norm_df = compute_normalization(mom_df)
-
-    # merge mom + normalization for downstream
-    mom_full_df = pd.concat([mom_df, norm_df], axis=1)
 
     # 4. MSI
     msi_df = compute_msi(mom_df, norm_df)
 
-    # 5. ALIGNMENT
+    # 5. Alignment
     align_df = compute_alignment(mom_df, norm_df)
 
-    # FINAL MERGE
+    # Final merge
     feature_df = pd.concat(
         [mom_df, norm_df, deriv_df, msi_df, align_df],
         axis=1
     )
+
+    return feature_df
+
+
+# ============================================================
+# PUBLIC API
+# ============================================================
+
+def compute_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute momentum feature family.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data (must contain 'adj_close').
+
+    Returns
+    -------
+    pd.DataFrame
+        Momentum features:
+        - index: datetime
+        - columns: feature names
+    """
+
+    feature_df = build_momentum_features(df)
+
+    # ---- enforce contract ----
+    feature_df = feature_df.sort_index()
+    feature_df = feature_df.loc[:, ~feature_df.columns.duplicated()]
 
     return feature_df

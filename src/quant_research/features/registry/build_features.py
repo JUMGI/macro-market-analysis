@@ -25,13 +25,13 @@ from quant_research.config.paths import MOMENTUM_FEATURE_PATH, VOLATILITY_FEATUR
 # Momentum engine (NUEVO)
 # ============================================================
 
-from quant_research.features.asset.momentum.feature_engine import build_momentum_features
+from quant_research.features.asset.momentum.compute import build_momentum_features
 
 # ============================================================
 # Volatility engine
 # ============================================================
 
-from quant_research.features.asset.volatility.feature_engine import build_volatility_features
+from src.quant_research.features.asset.volatility.compute import build_volatility_features
 
 # ============================================================
 # Helpers

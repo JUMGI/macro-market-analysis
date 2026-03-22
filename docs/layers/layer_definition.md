@@ -22,7 +22,7 @@ Not allowed:
 
 ---
 
-## Asset Characterization Layer
+## Asset Feature Layer
 
 Allowed:
 - Continuous statistical descriptors
