@@ -257,3 +257,42 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     feature_df = feature_df.loc[:, ~feature_df.columns.duplicated()]
 
     return feature_df
+
+from typing import List
+
+def get_feature_columns() -> List[str]:
+    cols = []
+
+    for h in LOOKBACK_WINDOWS:
+        cols += [
+            f"VOL_{h}",
+            f"VOL_{h}_Z",
+            f"VOL_{h}_PCTL",
+            f"VOL_{h}_VEL",
+            f"VOL_{h}_ACC",
+        ]
+
+        if h in SMOOTH_WINDOWS:
+            cols.append(f"VOL_{h}_VEL_S")
+            cols.append(f"VOL_{h}_ACC_S")
+
+    # VOV
+    for h in VOV_WINDOWS:
+        cols.append(f"VOV_{h}")
+        cols.append(f"VOV_{h}_Z")
+
+    # Term Structure
+    for short_h, long_h in TERM_STRUCTURE_PAIRS:
+        cols += [
+            f"VOL_TS_{short_h}_{long_h}",
+            f"VOL_TS_{short_h}_{long_h}_Z",
+            f"EXP_{short_h}_{long_h}",
+        ]
+
+    # VSI
+    cols.append("VSI")
+
+    if VSI_SMOOTH_WINDOW:
+        cols.append("VSI_S")
+
+    return cols

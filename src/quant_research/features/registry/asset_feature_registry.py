@@ -1,57 +1,124 @@
-# src/quant_research/features/registry/asset_feature_registry.py
-
-from typing import List
+from typing import List, Dict
 from quant_research.features.registry.feature_spec import FeatureSpec
-from quant_research.features.registry.build_features import (
-    build_momentum_features_spec,
-    build_volatility_features_spec,
-)
-from pathlib import Path
+from quant_research.features.registry.build_features import build_all_feature_specs
 
 
 class FeatureRegistry:
     """
-    Central registry of asset-level features.
+    Central registry of feature specifications (agent-ready).
+
+    - Data-independent
+    - Declarative
+    - Supports discovery, filtering, and execution
     """
 
-    def __init__(self, base_path: Path):
-        self._features = {}  # name -> FeatureSpec
-        self._bootstrap(base_path)
+    # ============================================================
+    # INIT
+    # ============================================================
 
-    def _bootstrap(self, base_path: Path):
-    
-        "Automatically populate the registry using the dynamic builders."
-   
-        specs = (
-            build_momentum_features_spec() +
-            build_volatility_features_spec()
-        )
+    def __init__(self):
+        self._features: Dict[str, FeatureSpec] = {}
+        self._bootstrap()
 
-        for f in specs:
-            self.register(f)
+    # ============================================================
+    # Bootstrap
+    # ============================================================
+
+    def _bootstrap(self):
+        """
+        Populate registry from builders (declarative, no data dependency).
+        """
+
+        specs = build_all_feature_specs()
+
+        for spec in specs:
+            self.register(spec)
+
+    # ============================================================
+    # Core API
+    # ============================================================
 
     def register(self, feature: FeatureSpec):
         """
-        Register a single FeatureSpec. Overwrites if the feature already exists.
+        Register a FeatureSpec.
+        Overwrites if name already exists.
         """
         self._features[feature.name] = feature
 
     def get(self, name: str) -> FeatureSpec:
+        """
+        Get a feature by name.
+        """
+        if name not in self._features:
+            raise KeyError(f"Feature '{name}' not found in registry")
+
         return self._features[name]
 
     def list(self) -> List[str]:
+        """
+        List all feature names.
+        """
         return list(self._features.keys())
 
     def get_many(self, names: List[str]) -> List[FeatureSpec]:
-        return [self._features[n] for n in names]
+        """
+        Get multiple features by name.
+        """
+        return [self.get(n) for n in names]
+
+    # ============================================================
+    # Discovery (important for agents)
+    # ============================================================
+
+    def list_families(self) -> List[str]:
+        """
+        List unique feature families.
+        """
+        return sorted(set(f.family for f in self._features.values()))
 
     def get_by_family(self, family: str) -> List[FeatureSpec]:
-        return [f for f in self._features.values() if f.family == family]
+        """
+        Get all features belonging to a family.
+        """
+        return [
+            f for f in self._features.values()
+            if f.family == family
+        ]
+
+    def get_by_level(self, level: str) -> List[FeatureSpec]:
+        """
+        Filter features by level ('asset' or 'systemic').
+        """
+        return [
+            f for f in self._features.values()
+            if f.level == level
+        ]
+
+    # ============================================================
+    # Introspection (agent-ready)
+    # ============================================================
+
+    def describe(self) -> List[dict]:
+        """
+        Return structured metadata for all features.
+        """
+
+        return [
+            {
+                "name": f.name,
+                "family": f.family,
+                "level": f.level,
+                "inputs": f.inputs,
+                "n_outputs": len(f.output_columns),
+                "frequency": f.frequency,
+            }
+            for f in self._features.values()
+        ]
 
 
 # ============================================================
-# Singleton
+# Factory (optional but clean)
 # ============================================================
 
-def create_registry(base_path: Path) -> FeatureRegistry:
-    return FeatureRegistry(base_path)
+def create_registry() -> FeatureRegistry:
+    return FeatureRegistry()
