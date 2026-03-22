@@ -49,9 +49,9 @@ It typically includes:
 Example:
 
 FeatureSpec(
-    name="momentum_63",
+    name="MOM_63",
     family="momentum",
-    compute_fn=compute_momentum_63,
+    compute_fn=compute_MOM_63,
 )
 
 Registry Structure
@@ -62,8 +62,8 @@ family → feature_name → FeatureSpec
 
 Example:
 
-registry["momentum"]["momentum_63"]
-registry["volatility"]["vol_252"]
+registry["momentum"]["MOM_63"]
+registry["volatility"]["VOL_252"]
 
 
 
@@ -93,7 +93,7 @@ Usage
 
 - Retrieve a Feature
 
-spec = registry.get(family="momentum", feature="momentum_63")
+spec = registry.get(family="momentum", feature="MOM_63")
 
 - Compute a Feature
 
@@ -103,7 +103,7 @@ df_feature = spec.compute_fn(df_raw)
 
 registry = create_registry(base_path)
 
-spec = registry.get("momentum", "momentum_63")
+spec = registry.get("momentum", "MOM_63")
 
 df_feature = spec.compute_fn(df_raw)
 
