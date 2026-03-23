@@ -226,7 +226,7 @@ def get_feature_columns() -> List[str]:
         cols.append(f"MOM_{h}_PCTL")
         cols.append(f"MOM_{h}_STAB")
 
-        if h in SMOOTH_WINDOWS:
+        if SMOOTH_WINDOWS.get(h):
             cols.append(f"MOM_{h}_VEL_S")
             cols.append(f"MOM_{h}_ACC_S")
 

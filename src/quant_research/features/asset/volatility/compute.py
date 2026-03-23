@@ -272,7 +272,7 @@ def get_feature_columns() -> List[str]:
             f"VOL_{h}_ACC",
         ]
 
-        if h in SMOOTH_WINDOWS:
+        if SMOOTH_WINDOWS.get(h):
             cols.append(f"VOL_{h}_VEL_S")
             cols.append(f"VOL_{h}_ACC_S")
 
