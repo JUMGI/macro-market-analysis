@@ -210,3 +210,31 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     feature_df = feature_df.loc[:, ~feature_df.columns.duplicated()]
 
     return feature_df
+
+# ============================================================
+# FEATURE COLUMN DEFINITION (CRITICAL)
+# ============================================================
+from typing import List
+def get_feature_columns() -> List[str]:
+    cols = []
+
+    for h in LOOKBACK_WINDOWS:
+        cols.append(f"MOM_{h}")
+        cols.append(f"MOM_{h}_VEL")
+        cols.append(f"MOM_{h}_ACC")
+        cols.append(f"MOM_{h}_Z")
+        cols.append(f"MOM_{h}_PCTL")
+        cols.append(f"MOM_{h}_STAB")
+
+        if h in SMOOTH_WINDOWS:
+            cols.append(f"MOM_{h}_VEL_S")
+            cols.append(f"MOM_{h}_ACC_S")
+
+    cols += [
+        "MSI", "MSI_S",
+        "MSI_VEL", "MSI_VEL_S",
+        "MSI_ACC", "MSI_ACC_S",
+        "MOM_ALIGN", "MOM_ALIGN_Z"
+    ]
+
+    return cols
