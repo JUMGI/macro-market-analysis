@@ -1,11 +1,14 @@
 # ============================================================
-# RAW MARKET DATA DOWNLOAD PIPELINE
+# RAW MARKET DATA DOWNLOAD PIPELINE (1D - FINAL STABLE)
 # ============================================================
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List
+import pandas as pd
 
-from quant_research.data.registry.universe_registry import ASSET_UNIVERSE, Asset
+from quant_research.config.paths import RAW_DATA_PATH
+
+from quant_research.data.registry.universe_registry import get_all_assets, Asset
 
 from quant_research.data.raw.helpers import (
     get_last_date,
@@ -14,6 +17,7 @@ from quant_research.data.raw.helpers import (
     normalize_columns,
     merge_with_existing,
     save_parquet,
+    get_effective_today,
 )
 
 from quant_research.data.raw.download_config import (
@@ -35,29 +39,23 @@ def run_download_pipeline(
     verbose: bool = True,
 ):
     """
-    Run raw data download pipeline.
+    Stable 1D raw data pipeline.
 
-    Parameters
-    ----------
-    assets : list[Asset], optional
-        Subset of assets to process (default: full universe)
-    start : str, optional
-        Override global START_DATE
-    end : str, optional
-        End date (default: today)
-    verbose : bool
-        Enable logging
+    Guarantees:
+    - no lookahead bias
+    - consistent temporal cutoff
+    - safe incremental updates
+    - automatic data correction (trimming)
     """
 
-    assets = assets or ASSET_UNIVERSE
-    today = end or datetime.today().strftime("%Y-%m-%d")
-    global_start = start or START_DATE
+    assets = assets if assets is not None else get_all_assets()
+    global_start = pd.to_datetime(start or START_DATE)
 
     if verbose:
         print("\n=== RAW DATA DOWNLOAD PIPELINE ===\n")
 
     # ========================================================
-    # Loop over assets
+    # Loop
     # ========================================================
 
     for asset in assets:
@@ -65,78 +63,120 @@ def run_download_pipeline(
         symbol = asset.symbol
         ticker = asset.get_ticker()
 
+        # ----------------------------------------------------
+        # Temporal truth
+        # ----------------------------------------------------
+
+        effective_today = get_effective_today(asset, end)
+        download_end = effective_today + pd.Timedelta(days=1)  # yfinance exclusive
+
         if verbose:
             print(f"Processing: {symbol} ({ticker})")
+            print(f"  Effective data date: {effective_today.date()}")
+
+        # ----------------------------------------------------
+        # Load existing dataset (if any)
+        # ----------------------------------------------------
+
+        path = RAW_DATA_PATH / f"{symbol}.parquet"
+
+        if path.exists():
+            df_existing = pd.read_parquet(path)
+            last_date = df_existing.index.max()
+        else:
+            df_existing = None
+            last_date = None
 
         # ----------------------------------------------------
         # Determine start date
         # ----------------------------------------------------
 
-        last_date = get_last_date(asset)
-
         if last_date is None:
             start_date = global_start
 
             if verbose:
-                print(f"  No existing data → full download from {start_date}")
+                print("  Last stored date: NONE")
+                print(f"  Full download from: {start_date.date()}")
 
         else:
-            start_date = (last_date + timedelta(days=1)).strftime("%Y-%m-%d")
+            start_date = last_date + pd.Timedelta(days=1)
 
             if verbose:
                 print(f"  Last stored date: {last_date.date()}")
-                print(f"  Incremental download from {start_date}")
+                print(f"  Incremental from: {start_date.date()}")
 
         # ----------------------------------------------------
-        # Skip if already up to date
+        # Download if needed
         # ----------------------------------------------------
 
-        if start_date > today:
+        df_new = pd.DataFrame()
+
+        if start_date <= effective_today:
+
             if verbose:
-                print("  Up to date\n")
+                print(f"  Download window (logical): {start_date.date()} → {effective_today.date()}")
+
+            df_new = download_asset(
+                asset=asset,
+                start_date=start_date,
+                end_date=download_end,
+                interval=INTERVAL,
+                auto_adjust=AUTO_ADJUST,
+                actions=ACTIONS,
+            )
+
+            if not df_new.empty:
+                if verbose:
+                    print(f"  Downloaded rows: {len(df_new)}")
+
+                df_new = validate_download(df_new)
+                df_new = normalize_columns(df_new)
+
+        else:
+            if verbose:
+                print("  Up to date")
+
+        # ----------------------------------------------------
+        # Merge logic
+        # ----------------------------------------------------
+
+        if df_existing is None and df_new.empty:
+            if verbose:
+                print("  No data available\n")
             continue
 
+        if df_existing is None:
+            df = df_new
+
+        elif df_new.empty:
+            df = df_existing
+
+        else:
+            df = merge_with_existing(df_new, asset)
+
         # ----------------------------------------------------
-        # Download
+        # 🔥 ALWAYS enforce temporal integrity
         # ----------------------------------------------------
 
-        df = download_asset(
-            asset=asset,
-            start_date=start_date,
-            end_date=today,
-            interval=INTERVAL,
-            auto_adjust=AUTO_ADJUST,
-            actions=ACTIONS,
-        )
+        before_rows = len(df)
 
-        if df.empty:
-            if verbose:
-                print("  No new data\n")
-            continue
+        df = df[df.index <= effective_today]
+
+        after_rows = len(df)
+
+        # ----------------------------------------------------
+        # Logging after trimming
+        # ----------------------------------------------------
 
         if verbose:
-            print(f"  Downloaded rows: {len(df)}")
 
-        # ----------------------------------------------------
-        # Validate
-        # ----------------------------------------------------
+            if after_rows < before_rows:
+                print(f"  ⚠️ Trimmed {before_rows - after_rows} future rows")
 
-        df = validate_download(df)
+            final_last_date = df.index.max()
 
-        # ----------------------------------------------------
-        # Normalize schema
-        # ----------------------------------------------------
-
-        df = normalize_columns(df)
-
-        # ----------------------------------------------------
-        # Merge with existing
-        # ----------------------------------------------------
-
-        df = merge_with_existing(df, asset)
-
-        if verbose:
-            print(f"  Total rows after merge: {len(df)}")
+            print(f"  Final last stored date: {final_last_date.date()}")
+            print(f"  Total rows: {len(df)}")
 
         # ----------------------------------------------------
         # Save

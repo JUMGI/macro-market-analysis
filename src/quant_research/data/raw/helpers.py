@@ -54,6 +54,7 @@ def load_parquet(asset: Asset) -> Optional[pd.DataFrame]:
 
 def save_parquet(df: pd.DataFrame, asset: Asset) -> None:
     path = _get_path(asset)
+    df.index = pd.to_datetime(df.index).tz_localize(None)
     df.to_parquet(path, engine="pyarrow")
 
 
@@ -61,11 +62,21 @@ def save_parquet(df: pd.DataFrame, asset: Asset) -> None:
 # Metadata helpers
 # ============================================================
 
-def get_last_date(asset: Asset) -> Optional[pd.Timestamp]:
-    df = load_parquet(asset)
-    if df is None or df.empty:
+def get_last_date(asset) -> pd.Timestamp:
+    path = RAW_DATA_PATH / f"{asset.symbol}.parquet"
+
+    if not path.exists():
         return None
-    return df.index.max()
+
+    df = pd.read_parquet(path)
+
+    ts = df.index.max()
+
+    # 🔥 critical fix
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert(None)
+
+    return ts
 
 
 # ============================================================
@@ -175,3 +186,33 @@ def merge_with_existing(df_new: pd.DataFrame, asset: Asset) -> pd.DataFrame:
     df = df.sort_index()
 
     return df
+
+def adjust_end_date_for_yfinance(end_date: pd.Timestamp) -> pd.Timestamp:
+    """
+    yfinance uses exclusive end date.
+
+    We shift by +1 day to make it inclusive.
+    """
+    return end_date + pd.Timedelta(days=1)
+
+def get_effective_today(asset: Asset, end: Optional[str] = None) -> pd.Timestamp:
+    """
+    Determine last safe date for an asset without lookahead bias.
+    """
+
+    if end is not None:
+        return pd.to_datetime(end)
+
+    now = pd.Timestamp.utcnow().tz_localize(None)
+    today = now.normalize()
+
+    if asset.asset_type == "crypto":
+        # Crypto candle closes at 00:00 UTC next day
+        if now.hour < 1:
+            return today - pd.Timedelta(days=2)
+        else:
+            return today - pd.Timedelta(days=1)
+
+    else:
+        # Equities / ETFs / bonds
+        return today - pd.Timedelta(days=1)
