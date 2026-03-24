@@ -1,16 +1,20 @@
 # ============================================================
-# RAW DATA HELPER FUNCTIONS
+# RAW DATA HELPERS
 # ============================================================
 
-from quant_research.config.paths import RAW_DATA_PATH
-import yfinance as yf
-import pandas as pd
 from pathlib import Path
-from datetime import datetime, timedelta
+from typing import Optional
 
-# ------------------------------------------------------------
-# Expected schema
-# ------------------------------------------------------------
+import pandas as pd
+import yfinance as yf
+
+from quant_research.config.paths import RAW_DATA_PATH
+from quant_research.data.registry.universe_registry import Asset
+
+
+# ============================================================
+# Constants
+# ============================================================
 
 EXPECTED_COLUMNS = [
     "Open",
@@ -25,29 +29,60 @@ EXPECTED_COLUMNS = [
 ]
 
 
-# ------------------------------------------------------------
-# Helper: check if parquet exists for an asset
-# ------------------------------------------------------------
-def parquet_exists(asset_symbol: str) -> bool:
-    file_path = RAW_DATA_PATH / f"{asset_symbol}.parquet"
-    return file_path.exists()
+# ============================================================
+# Path helpers
+# ============================================================
 
-# ------------------------------------------------------------
-# Helper: get last date in existing parquet
-# ------------------------------------------------------------
-def get_last_date(asset_symbol: str) -> pd.Timestamp:
-    file_path = RAW_DATA_PATH / f"{asset_symbol}.parquet"
-    if file_path.exists():
-        df = pd.read_parquet(file_path)
-        return df.index.max()
-    else:
+def _get_path(asset: Asset) -> Path:
+    return RAW_DATA_PATH / f"{asset.symbol}.parquet"
+
+
+# ============================================================
+# IO helpers
+# ============================================================
+
+def parquet_exists(asset: Asset) -> bool:
+    return _get_path(asset).exists()
+
+
+def load_parquet(asset: Asset) -> Optional[pd.DataFrame]:
+    path = _get_path(asset)
+    if not path.exists():
         return None
+    return pd.read_parquet(path)
 
-# ------------------------------------------------------------
-# Helper: download yfinance data for an asset
-# ------------------------------------------------------------
-def download_asset(asset, start_date=None, end_date=None, interval="1d",
-                   auto_adjust=False, actions=True):
+
+def save_parquet(df: pd.DataFrame, asset: Asset) -> None:
+    path = _get_path(asset)
+    df.to_parquet(path, engine="pyarrow")
+
+
+# ============================================================
+# Metadata helpers
+# ============================================================
+
+def get_last_date(asset: Asset) -> Optional[pd.Timestamp]:
+    df = load_parquet(asset)
+    if df is None or df.empty:
+        return None
+    return df.index.max()
+
+
+# ============================================================
+# Download
+# ============================================================
+
+def download_asset(
+    asset: Asset,
+    start_date: Optional[str],
+    end_date: Optional[str],
+    interval: str = "1d",
+    auto_adjust: bool = False,
+    actions: bool = True,
+) -> pd.DataFrame:
+    """
+    Download raw data from yfinance.
+    """
 
     ticker = asset.get_ticker()
 
@@ -58,14 +93,13 @@ def download_asset(asset, start_date=None, end_date=None, interval="1d",
         interval=interval,
         auto_adjust=auto_adjust,
         actions=actions,
-        progress=False
+        progress=False,
     )
 
     if df.empty:
-        print(f"Warning: no data for {ticker}")
         return df
 
-    # flatten yfinance columns
+    # flatten multiindex columns
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
@@ -73,99 +107,71 @@ def download_asset(asset, start_date=None, end_date=None, interval="1d",
 
     return df
 
+
 # ============================================================
-# VALIDATE DOWNLOADED DATA
+# Validation
 # ============================================================
 
 def validate_download(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Basic sanity checks on downloaded market data.
-
-    Raw data should remain as close as possible to the source.
-    No rows are removed except duplicated timestamps.
+    Basic sanity checks:
+    - datetime index
+    - sorted index
+    - no duplicated timestamps
     """
 
     if df.empty:
         return df
 
-    # ensure datetime index
     df.index = pd.to_datetime(df.index)
-
-    # sort by date
     df = df.sort_index()
-
-    # remove duplicated timestamps (can happen in incremental downloads)
     df = df[~df.index.duplicated(keep="last")]
 
     return df
 
+
 # ============================================================
-# NORMALIZE RAW DATA COLUMNS
+# Normalization
 # ============================================================
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Ensure all raw market datasets share the same schema.
-
-    Some assets (especially ETFs) include additional columns
-    such as 'Capital Gains'. Others may omit them.
-
-    This function guarantees a consistent column structure.
+    Enforce consistent raw data schema.
     """
+
+    if df.empty:
+        return df
 
     for col in EXPECTED_COLUMNS:
         if col not in df.columns:
             df[col] = 0.0
 
-    # enforce column order
-    df = df[EXPECTED_COLUMNS]
+    return df[EXPECTED_COLUMNS]
 
-    return df
 
 # ============================================================
-# MERGE WITH EXISTING DATA
+# Merge
 # ============================================================
 
-def merge_with_existing(df_new: pd.DataFrame, symbol: str) -> pd.DataFrame:
+def merge_with_existing(df_new: pd.DataFrame, asset: Asset) -> pd.DataFrame:
+    """
+    Merge new data with existing stored dataset.
+    """
 
-    path = RAW_DATA_PATH / f"{symbol}.parquet"
+    df_old = load_parquet(asset)
 
-    if not path.exists():
+    if df_old is None:
         return df_new
 
-    df_old = pd.read_parquet(path)
-
-    # --------------------------------------------------------
-    # Flatten columns if needed
-    # --------------------------------------------------------
-
+    # flatten columns if needed
     if isinstance(df_old.columns, pd.MultiIndex):
         df_old.columns = df_old.columns.get_level_values(0)
 
     if isinstance(df_new.columns, pd.MultiIndex):
         df_new.columns = df_new.columns.get_level_values(0)
 
-    # --------------------------------------------------------
-    # Merge
-    # --------------------------------------------------------
-
     df = pd.concat([df_old, df_new])
-
     df = df[~df.index.duplicated(keep="last")]
     df = df.sort_index()
 
     return df
-# ------------------------------------------------------------
-# Helper: save to parquet
-# ------------------------------------------------------------
-def save_parquet(df: pd.DataFrame, asset_symbol: str):
-    """
-    Save dataframe to parquet file.
-    """
-    file_path = RAW_DATA_PATH / f"{asset_symbol}.parquet"
-
-    df.to_parquet(file_path, engine="pyarrow")
-
-
-
-

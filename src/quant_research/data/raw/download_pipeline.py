@@ -3,9 +3,11 @@
 # ============================================================
 
 from datetime import datetime, timedelta
+from typing import Optional, List
 
-from quant_research.data.registry.universe_registry import ASSET_UNIVERSE
-from quant_research.data.raw.raw_data_helpers import (
+from quant_research.data.registry.universe_registry import ASSET_UNIVERSE, Asset
+
+from quant_research.data.raw.helpers import (
     get_last_date,
     download_asset,
     validate_download,
@@ -18,74 +20,105 @@ from quant_research.data.raw.download_config import (
     START_DATE,
     INTERVAL,
     AUTO_ADJUST,
-    ACTIONS
+    ACTIONS,
 )
 
 
-# ------------------------------------------------------------
-# Run download pipeline
-# ------------------------------------------------------------
+# ============================================================
+# Pipeline
+# ============================================================
 
-def run_download_pipeline():
+def run_download_pipeline(
+    assets: Optional[List[Asset]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    verbose: bool = True,
+):
+    """
+    Run raw data download pipeline.
 
-    print("\nStarting raw market data download pipeline...\n")
+    Parameters
+    ----------
+    assets : list[Asset], optional
+        Subset of assets to process (default: full universe)
+    start : str, optional
+        Override global START_DATE
+    end : str, optional
+        End date (default: today)
+    verbose : bool
+        Enable logging
+    """
 
-    today = datetime.today().strftime("%Y-%m-%d")
+    assets = assets or ASSET_UNIVERSE
+    today = end or datetime.today().strftime("%Y-%m-%d")
+    global_start = start or START_DATE
 
-    for asset in ASSET_UNIVERSE:
+    if verbose:
+        print("\n=== RAW DATA DOWNLOAD PIPELINE ===\n")
+
+    # ========================================================
+    # Loop over assets
+    # ========================================================
+
+    for asset in assets:
 
         symbol = asset.symbol
         ticker = asset.get_ticker()
 
-        print(f"Processing asset: {symbol} ({ticker})")
+        if verbose:
+            print(f"Processing: {symbol} ({ticker})")
 
         # ----------------------------------------------------
         # Determine start date
         # ----------------------------------------------------
 
-        last_date = get_last_date(symbol)
+        last_date = get_last_date(asset)
 
         if last_date is None:
+            start_date = global_start
 
-            start_date = START_DATE
-            print(f"  No existing data. Downloading full history from {start_date}")
+            if verbose:
+                print(f"  No existing data → full download from {start_date}")
 
         else:
-
             start_date = (last_date + timedelta(days=1)).strftime("%Y-%m-%d")
-            print(f"  Last stored date: {last_date.date()}")
+
+            if verbose:
+                print(f"  Last stored date: {last_date.date()}")
+                print(f"  Incremental download from {start_date}")
 
         # ----------------------------------------------------
         # Skip if already up to date
         # ----------------------------------------------------
 
         if start_date > today:
-
-            print("  Data already up to date.\n")
+            if verbose:
+                print("  Up to date\n")
             continue
 
         # ----------------------------------------------------
-        # Download new data
+        # Download
         # ----------------------------------------------------
 
         df = download_asset(
-            asset,
+            asset=asset,
             start_date=start_date,
             end_date=today,
             interval=INTERVAL,
             auto_adjust=AUTO_ADJUST,
-            actions=ACTIONS
+            actions=ACTIONS,
         )
 
         if df.empty:
-
-            print("  No new data downloaded.\n")
+            if verbose:
+                print("  No new data\n")
             continue
 
-        print(f"  Downloaded rows: {len(df)}")
+        if verbose:
+            print(f"  Downloaded rows: {len(df)}")
 
         # ----------------------------------------------------
-        # Validate dataset
+        # Validate
         # ----------------------------------------------------
 
         df = validate_download(df)
@@ -97,19 +130,22 @@ def run_download_pipeline():
         df = normalize_columns(df)
 
         # ----------------------------------------------------
-        # Merge incremental data
+        # Merge with existing
         # ----------------------------------------------------
 
-        df = merge_with_existing(df, symbol)
+        df = merge_with_existing(df, asset)
 
-        print(f"  Dataset rows after merge: {len(df)}")
+        if verbose:
+            print(f"  Total rows after merge: {len(df)}")
 
         # ----------------------------------------------------
-        # Save dataset
+        # Save
         # ----------------------------------------------------
 
-        save_parquet(df, symbol)
+        save_parquet(df, asset)
 
-        print()
+        if verbose:
+            print("  Saved\n")
 
-    print("Download pipeline finished.\n")
+    if verbose:
+        print("=== PIPELINE FINISHED ===\n")
