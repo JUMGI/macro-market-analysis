@@ -97,7 +97,7 @@ These responsibilities belong to higher layers.
 
 ## Position in Architecture
 
-
+```
 Asset Universe
 ↓
 Raw Data Layer
@@ -105,7 +105,7 @@ Raw Data Layer
 Processed Data Layer
 ↓
 Feature Layer
-
+```
 
 ---
 
