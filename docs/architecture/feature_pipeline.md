@@ -50,8 +50,8 @@ pipeline.run(
     end: Optional[str] = None,
     validate: bool = False,
     overwrite: bool = True
-)```
-
+)
+```
 
 ---
 
@@ -79,8 +79,8 @@ The pipeline uses the registry to:
 
 ```python
 spec = registry.get_by_family(family)[0]
-df = spec.compute_fn(df_raw)```
-
+df = spec.compute_fn(df_raw)
+```
 
 ---
 
@@ -90,7 +90,7 @@ Before saving:
 ```python
 expected = set(spec.output_columns)
 actual = set(df.columns)
-python```
+```
 
 The pipeline enforces:
 
