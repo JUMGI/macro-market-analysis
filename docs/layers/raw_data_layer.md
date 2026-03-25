@@ -81,6 +81,89 @@ All assets share the same schema.
 Running the pipeline multiple times produces the same result.
 
 ---
+## Temporal Integrity & Incremental Guarantees (New)
+
+The raw data layer enforces **strict temporal consistency** across all assets.
+
+### Effective Data Date (`effective_today`)
+
+Each pipeline run defines a maximum valid timestamp:
+
+- prevents usage of incomplete candles (e.g. crypto)
+- aligns assets with different trading calendars
+- acts as the **temporal boundary of the dataset**
+
+---
+
+### Temporal Enforcement
+
+After every pipeline execution, datasets are **strictly bounded**:
+
+```python
+df = df[df.index <= effective_today]
+```
+
+
+This ensures:
+
+- no future data leakage
+- no partial candles
+- no lookahead bias in downstream research
+
+---
+
+### Incremental Update Logic (Robust)
+
+The pipeline follows a **state-based approach**:
+
+- If no dataset exists → full download
+- If dataset exists → incremental download
+- If no new data → dataset is still validated and corrected
+
+---
+
+### Auto-Healing Property
+
+Datasets are automatically corrected if inconsistencies are detected.
+
+Example:
+
+- crypto candle downloaded before close
+- next pipeline run removes invalid data
+
+This guarantees:
+
+- long-term consistency
+- no manual intervention
+- stable research inputs
+
+---
+
+### Cross-Asset Consistency
+
+Different asset classes behave differently:
+
+- equities → discrete market close
+- crypto → continuous trading
+
+The pipeline normalizes this via `effective_today`, ensuring:
+
+- aligned time series
+- valid cross-asset comparisons
+- consistent feature computation
+
+---
+
+### Extended Guarantees
+
+In addition to the original properties, the layer now guarantees:
+
+- temporal correctness
+- cross-asset alignment
+- deterministic dataset boundaries
+- self-correcting behavior
+
+---
 
 ## What This Layer Does NOT Do
 

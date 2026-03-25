@@ -38,6 +38,129 @@ This ensures efficiency and avoids redundant downloads.
 
 ---
 
+## Temporal Handling (Critical)
+
+### Effective Data Date
+
+The pipeline introduces a **temporal control variable**:
+
+```python
+effective_today = get_effective_today(asset, end)
+```
+
+This represents the **latest valid data point** allowed in the dataset.
+
+---
+
+### Logical vs Physical Download Window
+
+The pipeline distinguishes between:
+
+**Logical window (desired data):**
+
+```
+start_date → effective_today
+```
+
+
+**Physical window (API requirement):**
+
+```
+start_date → effective_today + 1 day
+```
+
+(yfinance uses exclusive end dates)
+
+---
+
+## Robust Incremental Behavior
+
+The pipeline separates data flows explicitly:
+
+- `df_existing` → previously stored dataset
+- `df_new` → newly downloaded data
+
+Merge rules:
+
+- no existing + no new → skip
+- no existing → use new
+- no new → use existing
+- both → merge
+
+---
+
+## Temporal Integrity Enforcement
+
+Unlike traditional pipelines, this system enforces:
+
+```python
+df = df[df.index <= effective_today]
+```
+**always**, regardless of whether new data was downloaded.
+
+This ensures:
+
+- no stale future data remains
+- consistency across runs
+- reproducibility of datasets
+
+---
+
+## Auto-Correction Mechanism
+
+The pipeline is **self-healing**:
+
+- incorrect rows (e.g. incomplete crypto candles)
+- are automatically removed on subsequent runs
+
+This avoids:
+
+- hidden data corruption
+- silent lookahead bias
+
+---
+
+## Improved Logging
+
+The pipeline provides detailed logs per asset:
+
+- effective data date
+- last stored date
+- incremental or full download
+- logical download window
+- number of downloaded rows
+- trimming events
+- final dataset state
+
+Example:
+
+```
+Processing: BTC (BTC-USD)
+Effective data date: 2026-03-23
+Last stored date: 2026-03-24
+Incremental from: 2026-03-25
+⚠️ Trimmed 1 future rows
+Final last stored date: 2026-03-23
+```
+
+---
+
+## Design Upgrade
+
+The pipeline evolved from:
+
+- event-driven downloader
+to:
+- state-based data system
+
+This means:
+
+- outputs depend on dataset state, not just new events
+- consistency is enforced every run
+- datasets are guaranteed to converge to a valid state
+
+---
+
 ## Components
 
 ### Universe Registry
