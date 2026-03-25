@@ -231,9 +231,9 @@ run_download_pipeline()
 
 Optional parameters allow:
 
-subset of assets
-custom date ranges
-verbose logging control
+- subset of assets
+- custom date ranges
+- verbose logging control
 ---
 
 ## Logging

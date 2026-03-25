@@ -81,7 +81,7 @@ All assets share the same schema.
 Running the pipeline multiple times produces the same result.
 
 ---
-## Temporal Integrity & Incremental Guarantees (New)
+## Temporal Integrity & Incremental Guarantees 
 
 The raw data layer enforces **strict temporal consistency** across all assets.
 
