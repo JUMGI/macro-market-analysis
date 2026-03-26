@@ -3,6 +3,7 @@ import pandas as pd
 
 from quant_research.panels.utils.alignment import align_and_concat
 from quant_research.panels.utils.validation import validate_assets
+from quant_research.panels.contracts import enforce_panel_contract  # NEW
 
 
 class PanelBuilder:
@@ -15,7 +16,7 @@ class PanelBuilder:
 
     The resulting panel follows a standardized structure:
     - index: datetime
-    - columns: MultiIndex (asset, feature)
+    - columns: MultiIndex (feature, asset)
     """
 
     def __init__(self, feature_loader):
@@ -94,7 +95,40 @@ class PanelBuilder:
 
         # 4. Align and concatenate across assets
         panel = align_and_concat(merged_assets, method=alignment)
+        # ------------------------------------------------------------
+        # NEW: Enforce canonical panel contract
+        # ------------------------------------------------------------
+        # IMPORTANT:
+        # alignment step may return columns as (asset, feature)
+        # or without explicit names.
+        #
+        # We explicitly enforce the canonical structure:
+        #   level 0 → feature
+        #   level 1 → asset
+        #   names   → ["feature", "asset"]
+        #
+        # This ensures:
+        #   - consistent downstream usage
+        #   - stable API for research layer
+        #   - no dependency on alignment implementation details
+        #
+        # NOTE:
+        # This introduces a small overhead (swaplevel + sort_index),
+        # but correctness and explicit structure are prioritized
+        # at this stage of the project.
+        # ------------------------------------------------------------
 
+        if structure == "multiindex":
+            panel = enforce_panel_contract(panel)
+
+        # 5. Apply column structure (flat vs multiindex)
+        panel = self._apply_structure(panel, structure)
+
+        # 6. Handle missing values
+        panel = self._handle_nans(panel, nan_policy)
+
+        return panel
+    
         # 5. Apply column structure
         panel = self._apply_structure(panel, structure)
 
