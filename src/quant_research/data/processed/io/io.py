@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-from quant_research.data.processed.transforms import enforce_column_order
+from quant_research.data.processed.transforms.transforms import enforce_column_order
 
 def load_raw_parquet(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path)

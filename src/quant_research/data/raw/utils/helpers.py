@@ -10,6 +10,7 @@ import yfinance as yf
 
 from quant_research.config.paths import RAW_DATA_PATH
 from quant_research.data.registry.universe_registry import Asset
+from quant_research.data.raw.utils.io import load_parquet
 
 
 # ============================================================
@@ -29,33 +30,7 @@ EXPECTED_COLUMNS = [
 ]
 
 
-# ============================================================
-# Path helpers
-# ============================================================
 
-def _get_path(asset: Asset) -> Path:
-    return RAW_DATA_PATH / f"{asset.symbol}.parquet"
-
-
-# ============================================================
-# IO helpers
-# ============================================================
-
-def parquet_exists(asset: Asset) -> bool:
-    return _get_path(asset).exists()
-
-
-def load_parquet(asset: Asset) -> Optional[pd.DataFrame]:
-    path = _get_path(asset)
-    if not path.exists():
-        return None
-    return pd.read_parquet(path)
-
-
-def save_parquet(df: pd.DataFrame, asset: Asset) -> None:
-    path = _get_path(asset)
-    df.index = pd.to_datetime(df.index).tz_localize(None)
-    df.to_parquet(path, engine="pyarrow")
 
 
 # ============================================================
@@ -79,44 +54,6 @@ def get_last_date(asset) -> pd.Timestamp:
     return ts
 
 
-# ============================================================
-# Download
-# ============================================================
-
-def download_asset(
-    asset: Asset,
-    start_date: Optional[str],
-    end_date: Optional[str],
-    interval: str = "1d",
-    auto_adjust: bool = False,
-    actions: bool = True,
-) -> pd.DataFrame:
-    """
-    Download raw data from yfinance.
-    """
-
-    ticker = asset.get_ticker()
-
-    df = yf.download(
-        tickers=ticker,
-        start=start_date,
-        end=end_date,
-        interval=interval,
-        auto_adjust=auto_adjust,
-        actions=actions,
-        progress=False,
-    )
-
-    if df.empty:
-        return df
-
-    # flatten multiindex columns
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-
-    df.index = pd.to_datetime(df.index)
-
-    return df
 
 
 # ============================================================
@@ -195,24 +132,3 @@ def adjust_end_date_for_yfinance(end_date: pd.Timestamp) -> pd.Timestamp:
     """
     return end_date + pd.Timedelta(days=1)
 
-def get_effective_today(asset: Asset, end: Optional[str] = None) -> pd.Timestamp:
-    """
-    Determine last safe date for an asset without lookahead bias.
-    """
-
-    if end is not None:
-        return pd.to_datetime(end)
-
-    now = pd.Timestamp.utcnow().tz_localize(None)
-    today = now.normalize()
-
-    if asset.asset_type == "crypto":
-        # Crypto candle closes at 00:00 UTC next day
-        if now.hour < 1:
-            return today - pd.Timedelta(days=2)
-        else:
-            return today - pd.Timedelta(days=1)
-
-    else:
-        # Equities / ETFs / bonds
-        return today - pd.Timedelta(days=1)

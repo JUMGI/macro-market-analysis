@@ -10,17 +10,20 @@ from quant_research.config.paths import RAW_DATA_PATH
 
 from quant_research.data.registry.universe_registry import get_all_assets, Asset
 
-from quant_research.data.raw.helpers import (
+from quant_research.data.raw.utils.helpers import (
     get_last_date,
-    download_asset,
     validate_download,
     normalize_columns,
     merge_with_existing,
-    save_parquet,
-    get_effective_today,
+    
 )
+from quant_research.data.raw.sources.yahoo import download_ohlcv
 
-from quant_research.data.raw.download_config import (
+from quant_research.data.raw.utils.io import save_parquet
+
+from quant_research.data.raw.utils.time import get_effective_today
+
+from quant_research.data.raw.config.download_config import (
     START_DATE,
     INTERVAL,
     AUTO_ADJUST,
@@ -116,7 +119,7 @@ def run_download_pipeline(
             if verbose:
                 print(f"  Download window (logical): {start_date.date()} → {effective_today.date()}")
 
-            df_new = download_asset(
+            df_new = download_ohlcv(
                 asset=asset,
                 start_date=start_date,
                 end_date=download_end,

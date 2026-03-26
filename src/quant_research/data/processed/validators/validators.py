@@ -1,4 +1,4 @@
-from quant_research.data.processed.config import EXPECTED_COLUMNS
+from quant_research.data.processed.config.config import EXPECTED_COLUMNS
 
 
 def validate_expected_columns(df, asset: str) -> list:
