@@ -60,6 +60,8 @@ This contract guarantees:
 * Stable downstream APIs
 * Independence from alignment implementation details
 
+We enforce (feature, asset) ordering to optimize cross-sectional analysis,
+which is the primary use case of this research platform.
 ---
 
 ## Configuration Parameters

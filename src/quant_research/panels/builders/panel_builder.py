@@ -129,13 +129,7 @@ class PanelBuilder:
 
         return panel
     
-        # 5. Apply column structure
-        panel = self._apply_structure(panel, structure)
-
-        # 6. Handle missing values
-        panel = self._handle_nans(panel, nan_policy)
-
-        return panel
+ 
 
     # ============================================================
     # INTERNAL METHODS
@@ -246,8 +240,8 @@ class PanelBuilder:
 
         elif structure == "flat":
             panel.columns = [
-                f"{asset}_{feature}"
-                for asset, feature in panel.columns
+                f"{feature}_{asset}"
+                for feature, asset in panel.columns
             ]
             return panel
 
