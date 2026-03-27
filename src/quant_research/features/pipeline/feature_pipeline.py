@@ -1,10 +1,13 @@
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 import pandas as pd
 
 from quant_research.config.paths import PROCESSED_DATA_PATH, FEATURES_PATH
 from quant_research.features.registry.asset_feature_registry import create_registry
+from quant_research.data.processed.loaders.asset_processed_loader import (
+    AssetProcessedDataLoader
+)
 
 
 class FeaturePipeline:
@@ -12,7 +15,7 @@ class FeaturePipeline:
     Orchestrates feature computation, validation, and storage.
 
     Pipeline:
-    raw data → compute → (optional validate) → save parquet
+    processed data → compute → (optional asset validation) → save parquet
 
     Output structure:
     data/features/asset/{family}/{asset}.parquet
@@ -29,6 +32,9 @@ class FeaturePipeline:
     ):
         self.processed_path = Path(processed_path)
         self.features_path = Path(features_path)
+
+        # 🔥 Official data interface
+        self.loader = AssetProcessedDataLoader(self.processed_path)
 
         self.registry = create_registry()
 
@@ -54,43 +60,17 @@ class FeaturePipeline:
             if verbose:
                 print(f"\n=== PROCESSING ASSET: {asset} ===")
 
-            df_raw = self._load_raw(asset, start, end)
+            df_processed = self.loader.load_asset(asset, start, end)
 
             for family in families:
                 self._process_family(
                     asset=asset,
                     family=family,
-                    df_raw=df_raw,
+                    df_processed=df_processed,
                     validate=validate,
                     overwrite=overwrite,
                     verbose=verbose,
                 )
-
-    # ============================================================
-    # RAW DATA
-    # ============================================================
-
-    def _load_raw(
-        self,
-        asset: str,
-        start: Optional[str],
-        end: Optional[str],
-    ) -> pd.DataFrame:
-
-        path = self.processed_path / f"{asset}.parquet"
-
-        if not path.exists():
-            raise FileNotFoundError(f"Raw data not found: {path}")
-
-        df = pd.read_parquet(path)
-
-        if start:
-            df = df[df.index >= pd.to_datetime(start)]
-
-        if end:
-            df = df[df.index <= pd.to_datetime(end)]
-
-        return df
 
     # ============================================================
     # FAMILY PROCESSING
@@ -100,7 +80,7 @@ class FeaturePipeline:
         self,
         asset: str,
         family: str,
-        df_raw: pd.DataFrame,
+        df_processed: pd.DataFrame,
         validate: bool,
         overwrite: bool,
         verbose: bool,
@@ -117,7 +97,7 @@ class FeaturePipeline:
         if verbose:
             print(f"Computing {family} features...")
 
-        df_features = spec.compute_fn(df_raw)
+        df_features = spec.compute_fn(df_processed)
 
         # --------------------------------------------
         # Schema validation (critical)
@@ -134,10 +114,15 @@ class FeaturePipeline:
             print(f"Saved → {output_path}")
 
         # --------------------------------------------
-        # Optional value validation
+        # Optional asset-level validation
         # --------------------------------------------
         if validate:
-            self._run_validation(asset, family, df_raw, output_path)
+            self._run_asset_validation(
+                asset=asset,
+                family=family,
+                df_processed=df_processed,
+                output_path=output_path,
+            )
 
     # ============================================================
     # SPEC RESOLUTION
@@ -153,7 +138,6 @@ class FeaturePipeline:
         if not specs:
             raise ValueError(f"No features found for family: {family}")
 
-        # all specs share same compute_fn → take first
         return specs[0]
 
     # ============================================================
@@ -182,18 +166,18 @@ class FeaturePipeline:
             )
 
     # ============================================================
-    # VALUE VALIDATION (optional)
+    # ASSET-LEVEL VALIDATION (INTERNAL)
     # ============================================================
 
-    def _run_validation(
+    def _run_asset_validation(
         self,
         asset: str,
         family: str,
-        df_raw: pd.DataFrame,
+        df_processed: pd.DataFrame,
         output_path: Path,
     ):
         """
-        Hook to asset-specific validators.
+        Validate features for a single asset (deterministic check).
         """
 
         if family == "momentum":
@@ -211,7 +195,59 @@ class FeaturePipeline:
 
         validate_asset_features(
             asset=asset,
-            df_raw=df_raw,
+            df_raw=df_processed,  # naming inside validator
             asset_file=output_path,
             verbose=True,
         )
+
+    # ============================================================
+    # UNIVERSE VALIDATION (ANALYTICAL)
+    # ============================================================
+
+    def run_universe_validation(
+        self,
+        assets: List[str],
+        family: str,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+    ):
+        """
+        Run multi-asset (universe-level) validation.
+
+        This is a diagnostic tool, not part of the core pipeline.
+        """
+
+        if family == "momentum":
+            from quant_research.features.validation.asset.momentum_validator import (
+                validate_universe_features
+            )
+        elif family == "volatility":
+            from quant_research.features.validation.asset.volatility_validator import (
+                validate_universe_features
+            )
+        else:
+            raise ValueError(f"No validator available for family: {family}")
+
+        # ----------------------------------------
+        # Load processed data
+        # ----------------------------------------
+
+        asset_dfs = self.loader.load_universe(assets, start, end)
+
+        # ----------------------------------------
+        # Feature path
+        # ----------------------------------------
+
+        feature_path = self.features_path / "asset" / family
+
+        # ----------------------------------------
+        # Run validation
+        # ----------------------------------------
+
+        results = validate_universe_features(
+            asset_dfs=asset_dfs,
+            feature_path=feature_path,
+            verbose=True,
+        )
+
+        return results
