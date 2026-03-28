@@ -5,6 +5,10 @@ from quant_research.panels.utils.alignment import align_and_concat
 from quant_research.panels.utils.validation import validate_assets
 from quant_research.panels.contracts import enforce_panel_contract  # NEW
 
+PROCESSED_MAPPING = {
+    "log_ret": "RET_1",
+    "adj_close": "PRICE",
+}
 
 class PanelBuilder:
     """
@@ -19,7 +23,7 @@ class PanelBuilder:
     - columns: MultiIndex (feature, asset)
     """
 
-    def __init__(self, feature_loader):
+    def __init__(self, feature_loader, processed_loader):
         """
         Initialize the PanelBuilder.
 
@@ -31,6 +35,7 @@ class PanelBuilder:
                 load_asset_features(family: str, asset: str) -> pd.DataFrame
         """
         self.loader = feature_loader
+        self.processed_loader = processed_loader
 
     # ============================================================
     # PUBLIC API
@@ -46,6 +51,7 @@ class PanelBuilder:
         nan_policy: str = "keep",
         structure: str = "multiindex",
         validate: bool = True,
+        include_processed: Optional[List[str]] = None,   # 👈 NEW
     ) -> pd.DataFrame:
         """
         Build a cross-asset feature panel.
@@ -76,6 +82,8 @@ class PanelBuilder:
                 - "flat": "ASSET_FEATURE"
         validate : bool
             Whether to run structural validation on asset data.
+        include_processed: list[str]
+            List of columns from processed data: Typical ["log_ret", "adj_close"]
 
         Returns
         -------
@@ -87,7 +95,26 @@ class PanelBuilder:
         asset_data = self._load_data(assets, families, start, end)
 
         # 2. Merge feature families per asset
+        # ------------------------------------------------------------
+        # NEW: Load and merge processed data
+        # ------------------------------------------------------------
+        # 2. Merge feature families per asset
         merged_assets = self._merge_families(asset_data)
+        
+        if include_processed:
+            processed_data = self._load_processed_data(
+                assets=assets,
+                include_processed=include_processed,
+                start=start,
+                end=end
+            )
+
+            # merge processed into asset-level data
+            for asset in assets:
+                merged_assets[asset] = pd.concat(
+                    [merged_assets[asset], processed_data[asset]],
+                    axis=1
+                )
 
         # 3. Validate consistency across assets
         if validate:
@@ -211,6 +238,55 @@ class PanelBuilder:
             merged[asset] = pd.concat(family_dict.values(), axis=1)
 
         return merged
+    
+    def _load_processed_data(
+        self,
+        assets: List[str],
+        include_processed: List[str],
+        start: Optional[str],
+        end: Optional[str],
+    )-> Dict[str, pd.DataFrame]:
+        """
+        Load processed data per asset and map to panel naming.
+
+        Returns
+        -------
+        dict
+            asset -> DataFrame (columns already renamed)
+        """
+
+        processed_data = {}
+
+        valid_panel_names = set(PROCESSED_MAPPING.values())
+
+        missing = [col for col in include_processed if col not in valid_panel_names]
+
+        if missing:
+            raise ValueError(f"Unknown processed fields: {missing}")
+        # map panel names → raw names
+        reverse_mapping = {v: k for k, v in PROCESSED_MAPPING.items()}
+
+        for asset in assets:
+            df_proc = self.processed_loader.load_asset(asset)
+
+            # seleccionar columnas necesarias (raw)
+            raw_cols = [reverse_mapping[col] for col in include_processed]
+
+            df_proc = df_proc[raw_cols]
+
+            # filtrar fechas
+            if start:
+                df_proc = df_proc[df_proc.index >= pd.to_datetime(start)]
+
+            if end:
+                df_proc = df_proc[df_proc.index <= pd.to_datetime(end)]
+
+            # renombrar a naming del panel
+            df_proc = df_proc.rename(columns=PROCESSED_MAPPING)
+
+            processed_data[asset] = df_proc
+
+        return processed_data
 
     # ------------------------------------------------------------
 
