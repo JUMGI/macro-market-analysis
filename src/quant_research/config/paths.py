@@ -21,6 +21,8 @@ FEATURES_PATH = DATA_PATH / "features"
 
 ASSET_FEATURE_PATH = FEATURES_PATH / "asset"
 
+SYSTEMIC_PATH = DATA_PATH / "systemic"
+
 # ============================================================
 # Feature families
 # ============================================================
