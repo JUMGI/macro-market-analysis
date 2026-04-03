@@ -123,13 +123,11 @@ Properties:
 ## Design Principles
 ### 1. Separation of concerns
 
-Layer	                Responsibility
-------------------------------------------
-Builder	                Structure
------------------------------------------
-Preparer	            Data quality
------------------------------------------
-Systemic	            Market structure
+| Layer     | Responsibility   |
+|----------|------------------|
+| Builder   | Structure        |
+| Preparer  | Data quality     |
+| Systemic  | Market structure  |
 
 ---
 
