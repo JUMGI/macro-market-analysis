@@ -1,42 +1,54 @@
 import pandas as pd
 
-
 class PanelPreparer:
 
-    def __init__(self, config: dict):
-        self.config = config
+    def __init__(self, nan_config: dict):
+        self.nan_config = nan_config
 
-    def prepare(self, panel: pd.DataFrame):
+    # ------------------------------------------------------------
 
-        nan_cfg = self.config["nan_handling"]
+    def prepare(
+        self,
+        panel: pd.DataFrame,
+        required_features: list
+    ):
 
         panel_work = panel.copy()
 
         # -------------------------
-        # 1. FEATURE FILTER (opcional)
+        # 1. FILTER FEATURES 🔥
         # -------------------------
 
-        required_features = self._extract_required_features()
-
-        if nan_cfg["warmup"]["based_on"] == "used_features":
-            panel_work = panel_work.loc[:, panel_work.columns.get_level_values(0).isin(required_features)]
+        panel_work = panel_work.loc[
+            :,
+            panel_work.columns.get_level_values(0).isin(required_features)
+        ]
 
         # -------------------------
         # 2. WARMUP
         # -------------------------
 
+        warmup_cfg = self.nan_config["warmup"]
+
         warmup_start = None
 
-        if nan_cfg["warmup"]["method"] == "cut":
-            first_valid = panel_work.apply(lambda col: col.first_valid_index())
+        if warmup_cfg["method"] == "cut":
+
+            first_valid = panel_work.apply(
+                lambda col: col.first_valid_index()
+            )
+
             warmup_start = max(first_valid)
-            panel_work = panel_work.loc[panel_work.index >= warmup_start]
+
+            panel_work = panel_work.loc[
+                panel_work.index >= warmup_start
+            ]
 
         # -------------------------
         # 3. CALENDAR
         # -------------------------
 
-        method = nan_cfg["calendar"]["method"]
+        method = self.nan_config["calendar"]["method"]
 
         if method == "ffill":
             panel_work = panel_work.ffill()
@@ -45,23 +57,16 @@ class PanelPreparer:
         elif method == "drop":
             panel_work = panel_work.dropna()
 
+        # -------------------------
+        # 4. FINAL
+        # -------------------------
+
+        final_method = self.nan_config["final"]["method"]
+
+        if final_method == "dropna":
+            panel_work = panel_work.dropna()
+
         return panel_work, {
-            "warmup_start": str(warmup_start) if warmup_start else None,
-            "features_used": required_features
+            "features_used": required_features,
+            "warmup_start": str(warmup_start) if warmup_start else None
         }
-
-    # -------------------------
-    # HELPERS
-    # -------------------------
-
-    def _extract_required_features(self):
-
-        features = []
-
-        for f in self.config.get("features", {}).values():
-            for v in f.values():
-                features.append(v)
-
-        features.append("RET_1")
-
-        return list(set(features))

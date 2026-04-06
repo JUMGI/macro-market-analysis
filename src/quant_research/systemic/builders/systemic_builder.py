@@ -1,14 +1,20 @@
 import pandas as pd
 from quant_research.systemic.aggregators import AGGREGATOR_REGISTRY
-
+from quant_research.systemic.config.config_expander import SystemicConfigExpander
 
 class SystemicBuilder:
-    """
-    Build systemic features from a panel (feature, asset).
-    """
 
-    def __init__(self, config: list[dict]):
-        self.config = config
+    def __init__(self, configs):
+
+        # ----------------------------------------
+        # EXPAND CONFIG
+        # ----------------------------------------
+        expander = SystemicConfigExpander(configs)
+        self.configs = expander.expand()
+
+        print("\n[CONFIG EXPANDED]")
+        for c in self.configs:
+            print(c)
 
     # ============================================================
     # PUBLIC
@@ -18,10 +24,12 @@ class SystemicBuilder:
 
         if not isinstance(panel.columns, pd.MultiIndex):
             raise ValueError("Panel must have MultiIndex columns")
+        
+        configs = self.configs
 
         outputs = {}
 
-        for cfg in self.config:
+        for cfg in configs:
 
             name = cfg["name"]
             ftype = cfg["type"]
@@ -41,10 +49,8 @@ class SystemicBuilder:
             # PARAMS
             # ----------------------------------------
 
-            params = self._extract_params(
-                cfg,
-                exclude=["name", "type", "features", "input"]
-            )
+            params = cfg.get("params", {})
+                
 
             # ----------------------------------------
             # APPLY
@@ -85,5 +91,57 @@ class SystemicBuilder:
 
         return df
 
-    def _extract_params(self, cfg: dict, exclude: list[str]) -> dict:
-        return {k: v for k, v in cfg.items() if k not in exclude}
+
+    
+    def _expand_config(self):
+        
+        expanded = []
+
+        for cfg in self.config:
+
+            params = cfg.get("params")
+
+            # caso simple (sin expansión)
+            if not params:
+                expanded.append(cfg)
+                continue
+
+            # detectar listas en params
+            keys = []
+            values = []
+
+            for k, v in params.items():
+                if isinstance(v, list):
+                    keys.append(k)
+                    values.append(v)
+                else:
+                    keys.append(k)
+                    values.append([v])
+
+            # generar combinaciones
+            import itertools
+
+            for combo in itertools.product(*values):
+                new_cfg = cfg.copy()
+
+                combo_dict = dict(zip(keys, combo))
+
+                # expandir nombre
+                suffix = "_".join(str(v) for v in combo_dict.values())
+                new_cfg["name"] = f"{cfg['name']}_{suffix}"
+
+                # expandir features
+                new_features = []
+                for f in cfg.get("features", []):
+                    new_features.append(f.format(**combo_dict))
+
+                new_cfg["features"] = new_features
+
+                # reemplazar params por valores concretos
+                for k, v in combo_dict.items():
+                    new_cfg[k] = v
+
+                new_cfg.pop("params", None)
+
+                expanded.append(new_cfg)
+        return expanded

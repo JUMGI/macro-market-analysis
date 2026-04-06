@@ -1,14 +1,11 @@
 from typing import List, Optional, Dict
 import pandas as pd
+import json
 
 from quant_research.panels.utils.alignment import align_and_concat
 from quant_research.panels.utils.validation import validate_assets
 from quant_research.panels.contracts import enforce_panel_contract  # NEW
 
-PROCESSED_MAPPING = {
-    "log_ret": "RET_1",
-    "adj_close": "PRICE",
-}
 
 class PanelBuilder:
     """
@@ -23,7 +20,7 @@ class PanelBuilder:
     - columns: MultiIndex (feature, asset)
     """
 
-    def __init__(self, feature_loader, processed_loader):
+    def __init__(self, feature_loader, processed_loader, processed_metadata_path):
         """
         Initialize the PanelBuilder.
 
@@ -36,7 +33,14 @@ class PanelBuilder:
         """
         self.loader = feature_loader
         self.processed_loader = processed_loader
+        # ----------------------------------------
+        # LOAD METADATA
+        # ----------------------------------------
+        with open(processed_metadata_path, "r") as f:
+            metadata = json.load(f)
 
+        self.processed_feature_map = metadata["feature_map"]   # raw → panel
+        self.available_processed_features = set(metadata["features"])
     # ============================================================
     # PUBLIC API
     # ============================================================
@@ -101,6 +105,17 @@ class PanelBuilder:
         # 2. Merge feature families per asset
         merged_assets = self._merge_families(asset_data)
         
+        # ------------------------------------------------------------
+        # DEFAULT: include all processed features
+        # ------------------------------------------------------------
+
+        if include_processed is None:
+            include_processed = sorted(self.available_processed_features)
+
+        # ------------------------------------------------------------
+        # LOAD PROCESSED
+        # ------------------------------------------------------------
+
         if include_processed:
             processed_data = self._load_processed_data(
                 assets=assets,
@@ -109,13 +124,11 @@ class PanelBuilder:
                 end=end
             )
 
-            # merge processed into asset-level data
             for asset in assets:
                 merged_assets[asset] = pd.concat(
                     [merged_assets[asset], processed_data[asset]],
                     axis=1
                 )
-
         # 3. Validate consistency across assets
         if validate:
             validate_assets(merged_assets)
@@ -245,49 +258,59 @@ class PanelBuilder:
         include_processed: List[str],
         start: Optional[str],
         end: Optional[str],
-    )-> Dict[str, pd.DataFrame]:
+    ) -> Dict[str, pd.DataFrame]:
         """
-        Load processed data per asset and map to panel naming.
-
-        Returns
-        -------
-        dict
-            asset -> DataFrame (columns already renamed)
+        Load processed data using metadata-driven mapping.
         """
 
         processed_data = {}
 
-        valid_panel_names = set(PROCESSED_MAPPING.values())
+        # ----------------------------------------
+        # VALIDATION (against metadata)
+        # ----------------------------------------
 
-        missing = [col for col in include_processed if col not in valid_panel_names]
+        missing = [
+            col for col in include_processed
+            if col not in self.available_processed_features
+        ]
 
         if missing:
-            raise ValueError(f"Unknown processed fields: {missing}")
-        # map panel names → raw names
-        reverse_mapping = {v: k for k, v in PROCESSED_MAPPING.items()}
+            raise ValueError(f"Unknown processed features: {missing}")
+
+        # ----------------------------------------
+        # REVERSE MAP (panel → raw)
+        # ----------------------------------------
+
+        reverse_mapping = {
+            v: k for k, v in self.processed_feature_map.items()
+        }
+
+        # ----------------------------------------
+        # LOAD PER ASSET
+        # ----------------------------------------
 
         for asset in assets:
+
             df_proc = self.processed_loader.load_asset(asset)
 
-            # seleccionar columnas necesarias (raw)
+            # raw column names
             raw_cols = [reverse_mapping[col] for col in include_processed]
 
             df_proc = df_proc[raw_cols]
 
-            # filtrar fechas
+            # date filtering
             if start:
                 df_proc = df_proc[df_proc.index >= pd.to_datetime(start)]
 
             if end:
                 df_proc = df_proc[df_proc.index <= pd.to_datetime(end)]
 
-            # renombrar a naming del panel
-            df_proc = df_proc.rename(columns=PROCESSED_MAPPING)
+            # rename to panel naming
+            df_proc = df_proc.rename(columns=self.processed_feature_map)
 
             processed_data[asset] = df_proc
 
         return processed_data
-
     # ------------------------------------------------------------
 
     def _apply_structure(

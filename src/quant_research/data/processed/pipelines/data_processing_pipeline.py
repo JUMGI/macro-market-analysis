@@ -13,6 +13,8 @@ from quant_research.data.processed.io.io import save_processed_dataset
 
 from quant_research.data.processed.config.config import PROCESSED_COLUMNS
 
+from quant_research.data.processed.io.export_metadata import export_processed_metadata
+from quant_research.data.processed.config import config as processed_config
 
 def run_data_processing_pipeline():
 
@@ -51,6 +53,14 @@ def run_data_processing_pipeline():
         processed_data=processed_data,
         base_path=PROCESSED_DATA_PATH,
         columns=PROCESSED_COLUMNS
+    )
+
+    sample_df = df_processed  # o el primero del loop
+
+    export_processed_metadata(
+        sample_df=sample_df,
+        output_path=PROCESSED_DATA_PATH / "metadata.json",
+        config=processed_config
     )
 
     print("\n========================================")

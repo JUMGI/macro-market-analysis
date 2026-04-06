@@ -114,7 +114,26 @@ class FeatureRegistry:
             }
             for f in self._features.values()
         ]
+    def describe_expanded(self) -> List[dict]:
+        """
+        Return one entry per output column (atomic feature level).
+        """
 
+        expanded = []
+
+        for f in self._features.values():
+
+            for col in f.output_columns:
+                expanded.append({
+                    "name": col,
+                    "family": f.family,
+                    "level": f.level,
+                    "inputs": f.inputs,
+                    "source_feature": f.name,  # familia
+                    "frequency": f.frequency,
+                })
+
+        return expanded
 
 # ============================================================
 # Factory (optional but clean)
@@ -122,3 +141,4 @@ class FeatureRegistry:
 
 def create_registry() -> FeatureRegistry:
     return FeatureRegistry()
+

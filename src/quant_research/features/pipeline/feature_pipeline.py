@@ -3,11 +3,15 @@ from typing import List, Optional
 
 import pandas as pd
 
-from quant_research.config.paths import PROCESSED_DATA_PATH, FEATURES_PATH
+from quant_research.config.paths import PROCESSED_DATA_PATH, FEATURES_PATH, ASSET_FEATURE_PATH
 from quant_research.features.registry.asset_feature_registry import create_registry
 from quant_research.data.processed.loaders.asset_processed_loader import (
     AssetProcessedDataLoader
 )
+from quant_research.features.registry.export_registry import (
+    export_feature_registry_snapshot
+)
+
 
 
 class FeaturePipeline:
@@ -29,10 +33,12 @@ class FeaturePipeline:
         self,
         processed_path: Path = PROCESSED_DATA_PATH,
         features_path: Path = FEATURES_PATH,
+        
     ):
         self.processed_path = Path(processed_path)
         self.features_path = Path(features_path)
-
+        
+       
         # 🔥 Official data interface
         self.loader = AssetProcessedDataLoader(self.processed_path)
 
@@ -71,7 +77,10 @@ class FeaturePipeline:
                     overwrite=overwrite,
                     verbose=verbose,
                 )
-
+        export_feature_registry_snapshot(
+            registry=self.registry,
+            output_path=self.features_path /"asset"/ "registry_snapshot.json"
+        )
     # ============================================================
     # FAMILY PROCESSING
     # ============================================================
