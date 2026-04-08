@@ -1,7 +1,23 @@
-class BaseRegimeModel:
+from abc import ABC, abstractmethod
+import pandas as pd
 
-    def fit(self, X):
+
+class BaseRegimeModel(ABC):
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def fit(self, X: pd.DataFrame):
         return self
 
-    def predict(self, X):
-        raise NotImplementedError("predict() must be implemented")
+    @abstractmethod
+    def predict_proba(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Returns probabilities per state.
+
+        Output:
+        index = datetime
+        columns = [state_1, state_2, ...]
+        values sum to 1
+        """
+        pass
