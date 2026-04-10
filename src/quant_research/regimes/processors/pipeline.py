@@ -1,9 +1,13 @@
+# pipeline.py
+
 class ProcessorPipeline:
 
     def __init__(self, processors):
-        self.processors = processors
+        self.processors = processors or []
 
-    def transform(self, probs):
+    def apply(self, probs):
+
         for p in self.processors:
-            probs = p.transform(probs)
+            probs = p.apply(probs)
+
         return probs
