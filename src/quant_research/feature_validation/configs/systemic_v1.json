@@ -1,0 +1,46 @@
+{
+    "profile": "systemic",
+
+    "metrics": {
+        "stability": {
+            "enabled": true,
+            "params": {
+                "window": 63
+            }
+        },
+
+        "autocorr": {
+            "enabled": true,
+            "params": {
+                "lag": 1
+            }
+        },
+
+        "missing": {
+            "enabled": true,
+            "params": {}
+        },
+
+        "redundancy": {
+            "enabled": true,
+            "params": {
+                "method": "pearson"
+            }
+        }
+    },
+
+    "notes": {
+        "stability": "Measures variance stability via rolling std",
+        "autocorr": "Persistence of feature (important for regimes)",
+        "missing": "Data quality check",
+        "redundancy": "Max correlation with other features",
+
+        "future_metrics": [
+            "entropy",
+            "trend_strength",
+            "regime_separation_score",
+            "rolling_skewness",
+            "rolling_kurtosis"
+        ]
+    }
+}
