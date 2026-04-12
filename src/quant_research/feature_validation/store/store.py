@@ -12,7 +12,7 @@ class FeatureValidationStore:
         path = cls.BASE_PATH / metadata.dataset_id
         path.mkdir(parents=True, exist_ok=True)
 
-        file = path / f"{metadata.version}.json"
+        file = path / f"{metadata.fv_hash}.json"
 
         with open(file, "w") as f:
             json.dump(metadata.__dict__, f, indent=4)
