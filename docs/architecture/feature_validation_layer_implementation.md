@@ -15,7 +15,7 @@ The layer is designed to be:
 
 ## Directory Structure
 
-
+```
 feature_validation/
     metrics/
             stability.py
@@ -42,7 +42,10 @@ configs/
     validator.py
 
 utils/
-    hash.py
+    hash.py 
+    
+```
+
 
 ---
 
@@ -71,14 +74,14 @@ Examples:
 ## 2. Metric Registry
 
 Maps metric names to implementations.
-
+```python
 METRIC_REGISTRY = {
     "stability": compute_stability,
     "autocorr": compute_autocorr,
     "missing": compute_missing,
     "redundancy": compute_redundancy,
 }
-
+```
 ---
 
 ## 3. Profiles
@@ -127,7 +130,7 @@ Fields:
 
 Feature validation runs are identified by:
 
-fv_hash = hash(dataset_hash + config)
+`fv_hash = hash(dataset_hash + config)`
 
 This ensures:
 
@@ -141,7 +144,7 @@ This ensures:
 Validation is controlled via JSON config files.
 
 Example:
-
+```python
 {
     "metrics": {
         "stability": {
@@ -150,6 +153,7 @@ Example:
         }
     }
 }
+```
 
 ---
 ## 8. Config Validation
@@ -168,6 +172,7 @@ Artifacts are stored as:
 data/feature_validation/{dataset_id}/{fv_hash}.json
 
 ### Execution Flow
+```
 Load dataset
     ↓
 Load config
@@ -181,7 +186,7 @@ Run FeatureValidator
 Compute fv_hash
     ↓
  Save FeatureMetadata
-
+```
 ---
 ### Example Usage
 
@@ -221,7 +226,7 @@ Separation of IO
 
 ---
 ### Deterministic Artifacts
-- Same input → same fv_hash → same output
+- Same input → same `fv_hash` → same output
 
 ---
 ### Future Extensions
@@ -231,6 +236,7 @@ Separation of IO
 - Alpha-specific validation profiles
 - Feature clustering and grouping
 
+---
 ### Summary
 
 The implementation provides:
