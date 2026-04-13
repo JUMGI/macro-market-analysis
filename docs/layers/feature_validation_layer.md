@@ -107,6 +107,7 @@ A FeatureMetadata artifact containing:
 ---
 
 ## Example Output
+```json
 {
     "dataset_id": "baseline_v2",
     "dataset_hash": "...",
@@ -120,7 +121,7 @@ A FeatureMetadata artifact containing:
         }
     }
 }
-
+```
 ---
 
 ## Metrics
