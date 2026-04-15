@@ -25,6 +25,10 @@ SYSTEMIC_PATH = DATA_PATH / "systemic"
 
 FEATURE_VALIDATION_PATH = DATA_PATH / "feature_validation"
 
+RESEARCH_PATH = PROJECT_ROOT / "src" / "quant_research" / "research"
+
+RESEARCH_DATA_PATH = DATA_PATH / "research"
+
 # ============================================================
 # Feature families
 # ============================================================

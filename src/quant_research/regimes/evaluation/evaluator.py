@@ -20,7 +20,7 @@ from quant_research.regimes.evaluation.metrics.economic import (
     compute_regime_drawdown,
 )
 
-from quant_research.regimes.evaluation.aggregators import compute_grouped_score
+from quant_research.research.domains.regime.objective import compute_grouped_score
 
 
 class RegimeEvaluator:

@@ -1,0 +1,47 @@
+ {
+    "name": "regime_v1",
+    "model": {
+        "type": "rule_based",
+        "temperature": 0.7,
+        "regimes": [
+            {
+                "name": "bull",
+                "rules": [{
+                    "conditions": [
+                        {
+                            "feature": "mean_MOM_21",
+                            "op": ">",
+                            "value": 0,
+                            "scale": 0.02
+                        },
+                        {
+                            "feature": "breadth_MOM_21",
+                            "op": ">",
+                            "value": 0.6,
+                            "scale": 0.2
+                        }
+                    ]
+                }]
+            },
+            {
+                "name": "bear",
+                "rules": [{
+                    "conditions": [
+                        {
+                            "feature": "mean_MOM_21",
+                            "op": "<",
+                            "value": 0,
+                            "scale": 0.02
+                        }
+                    ]
+                }]
+            }
+        ]
+    },
+       "processors": [
+
+        {"type": "rolling_mean", "params": {"window": 5}}
+
+
+    ]
+}

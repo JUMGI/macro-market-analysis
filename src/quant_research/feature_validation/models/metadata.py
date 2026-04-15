@@ -99,3 +99,16 @@ class FeatureMetadata:
         )
 
         return [f[0] for f in sorted_feats[:n]]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FeatureMetadata":
+        return cls(
+            dataset_id=data["dataset_id"],
+            dataset_hash=data["dataset_hash"],
+            fv_hash=data["fv_hash"],
+            profile=data.get("profile", "default"),
+            config=data.get("config", {}),
+            metrics=data["metrics"],
+            created_at=data.get("created_at"),
+            version=data.get("version", "v1")
+        )
