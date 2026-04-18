@@ -1,68 +1,39 @@
 import pandas as pd
 from quant_research.systemic.aggregators import AGGREGATOR_REGISTRY
-from quant_research.systemic.config.config_expander import SystemicConfigExpander
+
+
 
 class SystemicBuilder:
 
-    def __init__(self, configs):
+    def __init__(self, features):
+        self.features = features
 
-        # ----------------------------------------
-        # EXPAND CONFIG
-        # ----------------------------------------
-        expander = SystemicConfigExpander(configs)
-        self.configs = expander.expand()
+       # print("\n[CONFIG EXPANDED]")
+       # for c in features:
+       #     print(c)
 
-        print("\n[CONFIG EXPANDED]")
-        for c in self.configs:
-            print(c)
+
+
 
     # ============================================================
     # PUBLIC
     # ============================================================
 
-    def build(self, panel: pd.DataFrame) -> pd.DataFrame:
-
-        if not isinstance(panel.columns, pd.MultiIndex):
-            raise ValueError("Panel must have MultiIndex columns")
-        
-        configs = self.configs
+    def build(self, panel):
 
         outputs = {}
 
-        for cfg in configs:
+        for feature in self.features:
 
-            name = cfg["name"]
-            ftype = cfg["type"]
-
-            # ----------------------------------------
-            # INPUT
-            # ----------------------------------------
-
-            if "input" in cfg:
-                data = outputs[cfg["input"]]
-
+            if feature.inputs and feature.inputs[0] in outputs:
+                data = outputs[feature.inputs[0]]
             else:
-                features = cfg.get("features", [])
-                data = self._extract_features(panel, features)
+                data = self._extract_features(panel, feature.inputs)
 
-            # ----------------------------------------
-            # PARAMS
-            # ----------------------------------------
-
-            params = cfg.get("params", {})
-                
-
-            # ----------------------------------------
-            # APPLY
-            # ----------------------------------------
-
-            func = AGGREGATOR_REGISTRY[ftype]
-            result = func(data, **params)
-
-            outputs[name] = result
+            func = AGGREGATOR_REGISTRY[feature.type]
+            outputs[feature.name] = func(data, **feature.params)
 
         return pd.DataFrame(outputs)
-
     # ============================================================
     # INTERNALS
     # ============================================================
@@ -93,55 +64,3 @@ class SystemicBuilder:
 
 
     
-    def _expand_config(self):
-        
-        expanded = []
-
-        for cfg in self.config:
-
-            params = cfg.get("params")
-
-            # caso simple (sin expansión)
-            if not params:
-                expanded.append(cfg)
-                continue
-
-            # detectar listas en params
-            keys = []
-            values = []
-
-            for k, v in params.items():
-                if isinstance(v, list):
-                    keys.append(k)
-                    values.append(v)
-                else:
-                    keys.append(k)
-                    values.append([v])
-
-            # generar combinaciones
-            import itertools
-
-            for combo in itertools.product(*values):
-                new_cfg = cfg.copy()
-
-                combo_dict = dict(zip(keys, combo))
-
-                # expandir nombre
-                suffix = "_".join(str(v) for v in combo_dict.values())
-                new_cfg["name"] = f"{cfg['name']}_{suffix}"
-
-                # expandir features
-                new_features = []
-                for f in cfg.get("features", []):
-                    new_features.append(f.format(**combo_dict))
-
-                new_cfg["features"] = new_features
-
-                # reemplazar params por valores concretos
-                for k, v in combo_dict.items():
-                    new_cfg[k] = v
-
-                new_cfg.pop("params", None)
-
-                expanded.append(new_cfg)
-        return expanded

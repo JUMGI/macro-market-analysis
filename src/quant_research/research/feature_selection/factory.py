@@ -1,11 +1,11 @@
-from quant_research.research.feature_selection.policies.hybrid_policy import HybridPolicy
+from quant_research.research.feature_selection.ranking.hybrid_ranker_v1 import HybridRanker
 
 
-def build_feature_selector(config):
+def build_feature_ranker(config: dict):
 
-    method = config.get("method", "hybrid")
+    ranker_name = config.get("ranker", "hybrid")
 
-    if method == "hybrid":
-        return HybridPolicy()
+    if ranker_name == "hybrid":
+        return HybridRanker(config)  # 🔥 PASAR TODO
 
-    raise ValueError(f"Unknown feature selection method: {method}")
+    raise ValueError(f"Unknown ranker: {ranker_name}")

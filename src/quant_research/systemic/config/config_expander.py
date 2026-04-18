@@ -1,6 +1,6 @@
 from itertools import product
 import copy
-
+from quant_research.systemic.features.feature_instance import FeatureInstance
 
 class SystemicConfigExpander:
 
@@ -17,8 +17,26 @@ class SystemicConfigExpander:
             # NO EXPANSION → PASA DIRECTO
             # ----------------------------------------
             if "expand" not in cfg:
-                expanded.append(cfg)
+                inputs = []
+
+                if "input" in cfg:
+                    inputs = [cfg["input"]]
+
+                elif "features" in cfg:
+                    inputs = cfg["features"]
+
+                params = cfg.get("params", {})
+
+                feature = FeatureInstance(
+                    name=cfg["name"],
+                    type_=cfg["type"],
+                    params=params,
+                    inputs=inputs
+                )
+
+                expanded.append(feature)
                 continue
+               
 
             expand_dict = cfg["expand"]
 
@@ -88,6 +106,27 @@ class SystemicConfigExpander:
                 # ----------------------------------------
                 del new_cfg["expand"]
 
-                expanded.append(new_cfg)
+                # ----------------------------------------
+                # BUILD FEATURE INSTANCE
+                # ----------------------------------------
+
+                inputs = []
+
+                if "input" in new_cfg:
+                    inputs = [new_cfg["input"]]
+
+                elif "features" in new_cfg:
+                    inputs = new_cfg["features"]
+
+                params = new_cfg.get("params", {})
+
+                feature = FeatureInstance(
+                    name=new_cfg["name"],
+                    type_=new_cfg["type"],
+                    params=params,
+                    inputs=inputs
+                )
+
+                expanded.append(feature)
 
         return expanded

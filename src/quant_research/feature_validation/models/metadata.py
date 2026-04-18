@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any, List
 import datetime
-
+from quant_research.research.feature_selection.groups.grouper import FeatureGrouper
 
 @dataclass
 class FeatureMetadata:
@@ -11,8 +11,9 @@ class FeatureMetadata:
     fv_hash: str
     profile: str
     config: Dict[str, Any]
-    metrics: Dict[str, Dict[str, Any]]
     
+    metrics: Dict[str, Dict[str, Any]]
+    feature_info: Dict[str, Dict[str, Any]]
 
     created_at: str = field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
     version: str = "v1"
@@ -23,9 +24,21 @@ class FeatureMetadata:
 
     def get_feature(self, name: str) -> Dict[str, Any]:
         return self.metrics.get(name, {})
+    def get_info(self, name: str) -> Dict[str, Any]:
+        return self.feature_info.get(name, {})
 
     def list_features(self) -> List[str]:
         return list(self.metrics.keys())
+    
+    # -------------------------
+    # 🔥 NUEVO: grouping nativo
+    # -------------------------
+
+    def get_feature_groups(self) -> dict:
+
+        grouper = FeatureGrouper()
+
+        return grouper.group(self.feature_info)
 
     # -------------------------
     # Filtering (MUY IMPORTANTE)

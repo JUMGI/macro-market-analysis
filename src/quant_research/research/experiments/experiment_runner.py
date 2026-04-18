@@ -3,7 +3,7 @@ from quant_research.data.feature_validation.loaders.fv_loader import load_featur
 
 from quant_research.feature_validation.models.metadata import FeatureMetadata
 
-from quant_research.research.feature_selection.factory import build_feature_selector
+from quant_research.research.feature_selection.factory import build_feature_ranker
 from quant_research.research.domains.regime.configs.loaders.regime_config_loader import load_regime_config
 from quant_research.research.experiments.config_builder import RegimeConfigBuilder
 from quant_research.research.domains.regime.executor import RegimeExecutor
@@ -53,14 +53,14 @@ class ExperimentRunner:
         metadata = fv_metadata
 
         fs_config = config.get("feature_selection", {})
-        selector = build_feature_selector(fs_config)
+        ranker = build_feature_ranker(fs_config)
 
-        selected_features = selector.select(metadata, fs_config)
+        ranked_groups = ranker.rank(metadata)
 
-        if len(selected_features) == 0:
-            raise ValueError("No features selected")
+        if len(ranked_groups) == 0:
+            raise ValueError("No ranked groups")
 
-        print(selected_features)
+        print(ranked_groups)
         # -------------------------
         # 5. Load Regime Config
         # -------------------------

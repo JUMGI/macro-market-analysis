@@ -12,7 +12,8 @@ class RegimeResearchEvaluator:
         evaluator = RegimeEvaluator(self.config)
 
                 
-        returns = dataset["data"][target_col]
+        #returns = dataset["data"][target_col]
+        returns = dataset.data[target_col]
         results = evaluator.evaluate(regime_df, returns)
 
         

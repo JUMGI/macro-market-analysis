@@ -12,12 +12,25 @@ class FeatureValidator:
         self.dataset_hash = dataset_hash
         self.config = config or {}
 
-    def validate(self, features: pd.DataFrame) -> FeatureMetadata:
+    def validate(self, features: pd.DataFrame, feature_info: Dict) -> FeatureMetadata:
 
         fv_hash = compute_fv_hash(
         dataset_hash=self.dataset_hash,
         config=self.config
         )
+        # ----------------------------------------
+        # VALIDATE FEATURE METADATA CONSISTENCY
+        # ----------------------------------------
+
+        missing = [
+            col for col in features.columns
+            if col not in feature_info
+        ]
+
+        if missing:
+            raise ValueError(
+                f"[FeatureValidator] Missing feature metadata for: {missing}"
+            )
 
         results = {}
 
@@ -39,8 +52,8 @@ class FeatureValidator:
             fv_hash=fv_hash,
             profile=self.profile.__class__.__name__,
             config=self.config,
-            metrics=results
-            
+            metrics=results,
+            feature_info=feature_info   # 🔥 NUEVO
         )
 
         return metadata
