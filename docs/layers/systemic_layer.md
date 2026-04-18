@@ -45,10 +45,22 @@ The input panel must be:
 The systemic layer applies **cross-sectional operators** to transform:
 
 ```
-asset-level features → systemic features
+asset-level features (panel) → systemic feature instances
 ```
 
 Instead of analyzing each asset independently, we compute statistics **across assets at each point in time**.
+
+Additionally, systemic features can form a **directed acyclic graph (DAG)**:
+
+- some features depend on raw panel features
+- others depend on previously computed systemic features
+
+Example:
+
+`mean(MOM_63) → zscore(mean(MOM_63))`
+
+
+This enables composability and layered transformations.
 
 ---
 
@@ -104,25 +116,79 @@ Measures **how synchronized the market is**.
 
 ---
 
+## Feature Definition
+
+Systemic features are defined via configuration and expanded into **feature instances**.
+
+Each feature instance contains:
+
+- name
+- type (aggregator)
+- inputs
+- params
+
+This enables:
+
+- parameter sweeps (via config expansion)
+- reproducible experiments
+- consistent feature generation
+
+---
+
+
 ## Output
 
-The systemic layer produces a dataset:
+The systemic layer produces a **dataset bundle** composed of:
 
-### `df_systemic`
+### 1. `systemic.parquet`
 
-- **index**: datetime  
-- **columns**: systemic features  
+- cross-asset aggregated features
+- **index**: datetime
+- **columns**: systemic feature names
 
-Example:
+### 2. `systemic_z.parquet`
 
+- standardized version of the dataset (z-score applied column-wise)
 
-- mean_return
-- dispersion_return
-- breadth_momentum
-- correlation_return
-- ...
+$$
+Z = \frac{X - \mu}{\sigma}
+$$
 
-This dataset represents the **state of the market at each point in time**.
+- computed **after final NaN handling**
+
+---
+
+### 3. `metadata.json`
+
+The metadata is the **single source of truth** describing the dataset.
+
+It includes:
+
+#### Dataset-level metadata
+
+- `name`
+- `dataset_hash`
+- `panel_hash`
+- `config_hash`
+- `n_rows`
+- `n_features`
+
+#### Feature-level metadata (enriched)
+
+Each feature contains:
+
+- `measure` → what is being measured (e.g. momentum, volatility)
+- `operator` → cross-sectional operator (mean, std, etc.)
+- `transform` → optional transformation (e.g. zscore)
+- `domain` → semantic grouping
+- `inputs` → dependencies (panel features or upstream systemic features)
+- `params` → configuration parameters
+
+This allows:
+
+- full traceability
+- feature grouping
+- downstream research (feature selection, regime modeling)
 
 ---
 
@@ -150,10 +216,15 @@ Cross-asset calendars are unified:
 
 ### 3. Final NaN Policy
 
-After transformations:
+Final NaN handling is applied **before export**, based on configuration:
 
-- remaining NaNs are removed (`dropna`)
-- final dataset contains no missing values
+- if `dropna` → rows with NaNs are removed
+- otherwise → NaNs may remain
+
+This policy directly impacts:
+
+- `systemic.parquet`
+- `systemic_z.parquet`
 
 ---
 
@@ -175,6 +246,30 @@ The systemic layer follows these principles:
 
 - **Transparent**  
   All transformations are explicit and auditable
+
+---
+
+## Reproducibility & Hashing
+
+Each systemic dataset is uniquely identified using hashes:
+
+- **dataset_hash** → hash of `systemic.parquet`
+- **panel_hash** → hash of input panel
+- **config_hash** → hash of full configuration
+
+This enables:
+
+- exact reproducibility
+- dataset versioning
+- integrity checks across pipeline stages
+
+Any change in:
+
+- input data
+- configuration
+- feature definitions
+
+will result in a different dataset hash.
 
 ---
 
@@ -236,3 +331,16 @@ This separation ensures a clear distinction between:
 ## Summary
 
 The systemic layer transforms a collection of asset-level signals into a **coherent representation of the market as a system**, enabling higher-level modeling such as regime detection and allocation strategies.
+
+## Integration with Feature Validation
+
+The systemic layer is designed to integrate with the Feature Validation layer.
+
+- metadata provides feature-level descriptors
+- validation computes quality metrics (stability, redundancy, etc.)
+
+This enables:
+
+- systematic feature selection
+- research-driven filtering
+- robust downstream modeling

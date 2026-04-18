@@ -12,11 +12,11 @@ It sits above the asset feature layer and below the regime layer.
 
 Asset Features (MOM, VOL, RET, etc.)
         ↓
-Panel Builder (estructura + raw panel)
+Panel Builder (raw cross-asset panel)
         ↓
 Panel Preparer (cleaning + alignment + NaNs)
         ↓
-Systemic Pipeline (cross-asset aggregation)
+Systemic Pipeline (feature DAG + cross-asset aggregation)
         ↓
 Regime Layer
         ↓
@@ -48,7 +48,7 @@ A multi-asset DataFrame:
 
 
 - index: time
-- columns: MultiIndex [asset, feature]
+- columns: MultiIndex [feature, asset]
 
 
 Example features:
@@ -72,6 +72,17 @@ Each entry defines:
 - type (mean, dispersion, breadth, correlation, zscore)
 - input features
 - optional parameters (window, threshold)
+
+These configurations are expanded into **feature instances**, where:
+
+- each combination of parameters generates a concrete feature
+- features become nodes in a computation graph (DAG)
+
+This allows:
+
+- parameter sweeps (e.g. multiple lookbacks)
+- composability of transformations
+- reproducible feature generation
 
 ---
 
@@ -140,19 +151,78 @@ mean_mom_z = zscore(mean_mom, window=20)
 ---
 ## Output
 
-The pipeline produces:
+The pipeline produces a **dataset bundle**:
 
-### Systemic DataFrame
-index: time
-columns:
-    mean_mom
-    mean_vol
-    dispersion_mom
-    dispersion_ret
-    breadth_mom
-    corr_ret
-    corr_mom
-    mean_mom_z
+### 1. `systemic.parquet`
+
+- cross-asset systemic features
+- **index**: datetime
+- **columns**: feature names
+
+---
+
+### 2. `systemic_z.parquet`
+
+- standardized version (z-score per feature)
+
+$$
+Z = \frac{X - \mu}{\sigma}
+$$
+
+- computed after final NaN handling
+
+---
+
+### 3. `metadata.json`
+
+The metadata is the **single source of truth** for the dataset.
+
+It includes:
+
+#### Dataset-level
+
+- name
+- dataset_hash
+- panel_hash
+- config_hash
+- n_rows
+- n_features
+
+#### Feature-level (enriched)
+
+For each feature:
+
+- measure
+- operator
+- transform
+- domain
+- inputs
+- params
+
+This enables:
+
+- traceability
+- feature grouping
+- downstream research workflows
+
+---
+## Computation Model
+
+Systemic features are computed as a **Directed Acyclic Graph (DAG)**:
+
+- base features depend on panel inputs
+- derived features depend on previously computed systemic features
+
+Example:
+`mean(MOM_63) → zscore(mean(MOM_63))`
+
+
+This enables:
+
+- composability
+- reuse of intermediate features
+- flexible feature pipelines
+---
 
 ## Design Principles
 ### 1. Config-driven
@@ -184,12 +254,28 @@ Each run is fully reproducible via:
 - full config snapshot in metadata
 
 ---
+
+## Hashing
+
+Each dataset is uniquely identified by:
+
+- dataset_hash → hash of systemic dataset
+- panel_hash → hash of input panel
+- config_hash → hash of configuration
+
+This ensures:
+
+- exact reproducibility
+- version control of datasets
+- consistency across pipeline stages
+---
+
 ## Output Contract
 
 Each run produces:
 
-- `systemic_features.parque`t
-- `systemic_features_z.parquet`
+- `systemic.parquet`
+- `systemic_z.parquet`
 - `metadata.json`
 
 ---
@@ -197,30 +283,47 @@ Each run produces:
 
 Metadata includes:
 
-### Identity
-- run name
-- timestamp
-- dataset hash
-- config hash
+### Dataset Identity
 
-### Data summary
-shape
-- columns
-- assets
-- date range
+- name
+- dataset_hash
+- panel_hash
+- config_hash
 
-### Systemic summary
-- feature list
-- feature count
+---
 
-### Audit
-- nan checks
-- extreme values
-- validation status
+### Dataset Summary
+
+- n_rows
+- n_features
+
+---
+
+### Feature Metadata (enriched)
+
+Each feature contains:
+
+- measure
+- operator
+- transform
+- domain
+- inputs
+- params
+
+---
+
+### Purpose
+
+Metadata enables:
+
+- reproducibility
+- feature introspection
+- integration with feature validation layer
+- downstream research (selection, clustering, regimes)
 
 ---
 ## Pipeline Guarantees
-- No NaNs (post-cleaning stage)
+- NaN handling is config-driven (may include dropna)
 - Deterministic output
 - Consistent feature ordering
 - Fully reproducible results
@@ -240,6 +343,10 @@ Planned enhancements:
 ### 4. Graph-based correlation
 - asset network structure
 - clustering regimes
+### 5. Feature validation integration
+- quality-based feature filtering
+- redundancy reduction
+- stability-aware selection
 
 ---
 ## Summary
